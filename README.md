@@ -125,7 +125,53 @@ FRONTEND_URL=http://localhost:3000
 
 ## Deployment
 
-This backend is designed to be deployed independently from the frontend. Consider using:
+This backend is designed to be deployed independently from the frontend.
+
+### Vercel Deployment
+
+This project is configured for Vercel deployment. Follow these steps:
+
+1. **Create a new repository** and copy the contents of this folder
+
+2. **Connect to Vercel**
+   ```bash
+   # Install Vercel CLI (optional)
+   npm i -g vercel
+
+   # Deploy
+   vercel
+   ```
+
+3. **Configure Environment Variables** in Vercel Dashboard:
+   - Go to Project > Settings > Environment Variables
+   - Add the following variables:
+
+   | Variable | Description |
+   |----------|-------------|
+   | `DATABASE_URL` | MySQL connection string |
+   | `JWT_SECRET` | Secret for JWT tokens |
+   | `TOKEN_SECRET` | Secret for email verification tokens |
+   | `FRONTEND_URL` | Your frontend URL (for email links) |
+   | `CORS_ORIGINS` | Comma-separated allowed origins |
+   | `SMTP_HOST` | SMTP server hostname |
+   | `SMTP_PORT` | SMTP port (587 or 465) |
+   | `SMTP_SECURE` | "true" or "false" |
+   | `SMTP_USER` | SMTP username |
+   | `SMTP_PASSWORD` | SMTP password |
+
+4. **Database Setup**
+   - Use a MySQL-compatible database (PlanetScale, AWS RDS, etc.)
+   - Ensure your database allows connections from Vercel's IP ranges
+
+### Build Settings
+
+If deploying via Vercel Dashboard:
+- **Build Command**: `npm run vercel-build`
+- **Output Directory**: `dist`
+- **Install Command**: `npm install`
+
+### Other Deployment Options
 
 - **Development**: Local development server
-- **Staging/Production**: Docker containers, Heroku, AWS, or similar platforms
+- **Docker**: Container-based deployment
+- **AWS/Heroku**: Traditional cloud platforms

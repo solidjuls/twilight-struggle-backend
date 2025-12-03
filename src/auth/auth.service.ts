@@ -2,13 +2,15 @@ import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
 import { DatabaseService } from '../database/database.service';
-import { LoginDto, AuthResponseDto, JwtPayloadDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, RegisterUserResponse } from './dto/auth.dto';
+import { EmailService, SMTPConfig } from '../email/email.service';
+import { LoginDto, AuthResponseDto, JwtPayloadDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, RegisterUserResponse, EmailVerifyRequestDto, EmailVerifyConfirmDto, EmailVerifyResponse } from './dto/auth.dto';
 
 @Injectable()
 export class AuthService {
   constructor(
     private databaseService: DatabaseService,
     private jwtService: JwtService,
+    private emailService: EmailService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<{ user: AuthResponseDto; token: string }> {
@@ -26,36 +28,55 @@ export class AuthService {
       );
     }
 
+    // Check if email is verified
+    if (!user.email_verified_at) {
+      throw new UnauthorizedException({
+        message: 'Email not verified',
+        code: 'EMAIL_NOT_VERIFIED',
+        error: 'Your email address has not been verified. Please check your email and verify your account before logging in.'
+      });
+    }
+
     if (!user.password) {
+      console.log("password")
       throw new UnauthorizedException('The password is incorrect');
     }
 
     // Verify password
     const isPasswordValid = await compare(pwd, user.password);
     if (!isPasswordValid) {
+      console.log("isPasswordValid")
       throw new UnauthorizedException('The password is incorrect');
     }
 
-    // Get tournaments admin
-    const tournamentsAdmin = await this.databaseService.tournament_admins.findMany({
-      select: { tournamentId: true },
-      where: { userId: user.id },
+    return this.generateAuthResponse(user);
+  }
+
+  async impersonate(email: string, impersonatorUser: any): Promise<{ user: AuthResponseDto; token: string }> {
+    // Check if impersonator is superadmin
+    if (impersonatorUser.role !== 1) {
+      throw new UnauthorizedException('Only superadmins can impersonate other users');
+    }
+
+    // Find user to impersonate by email
+    const user = await this.databaseService.users.findFirst({
+      where: { email },
     });
 
-    // Get tournaments registered
-    const tournamentsRegistered = await this.databaseService.tournament_registration.findMany({
-      select: { tournamentId: true },
-      where: { player_email: mail },
-    });
+    if (!user) {
+      throw new UnauthorizedException("User doesn't exist.");
+    }
 
+    return this.generateAuthResponse(user);
+  }
+
+  private async generateAuthResponse(user: any): Promise<{ user: AuthResponseDto; token: string }> {
     // Create JWT payload
     const payload: JwtPayloadDto = {
       mail: user.email!,
-      name: user.name!,
+      name: user.first_name!,
       role: user.role_id || 3, // Default to player role if not set
       id: user.id.toString(),
-      tournamentsAdmin: tournamentsAdmin.map(t => Number(t.tournamentId)),
-      tournamentsRegistered: tournamentsRegistered.map(t => Number(t.tournamentId)),
     };
 
     // Generate JWT token
@@ -65,11 +86,10 @@ export class AuthService {
 
     // Prepare response
     const authResponse: AuthResponseDto = {
-      name: user.name!,
+      name: user.first_name!,
       email: user.email!,
       id: user.id.toString(),
-      role: user.role_id || 3, // Default to player role if not set
-      tournaments: tournamentsRegistered.map(t => Number(t.tournamentId)),
+      role: user.role_id || 3,
     };
 
     return { user: authResponse, token };
@@ -136,7 +156,7 @@ export class AuthService {
   }
 
   async createUser(createUserDto: CreateUserDto): Promise<{ success: boolean; user?: AuthResponseDto }> {
-    const { email, password, name, first_name, last_name, role_id } = createUserDto;
+    const { email, password, playdek_name, first_name, last_name, role_id } = createUserDto;
 
     // Check if user already exists
     const existingUser = await this.databaseService.users.findFirst({
@@ -155,27 +175,38 @@ export class AuthService {
       data: {
         email,
         password: hashedPassword,
-        name,
-        first_name: first_name || name.split(' ')[0],
-        last_name: last_name || name.split(' ')[1] || '',
-        role_id: role_id || 3, // Default to player role
+        playdek_name: playdek_name,
+        first_name: first_name,
+        last_name: last_name,
+        role_id: role_id || 3,
       },
     });
 
     // Prepare response
     const userResponse: AuthResponseDto = {
-      name: newUser.name!,
+      name: newUser.first_name!,
       email: newUser.email!,
       id: newUser.id.toString(),
       role: newUser.role_id || 3,
-      tournaments: [],
     };
 
     return { success: true, user: userResponse };
   }
 
   async registerUser(registerDto: RegisterUserDto): Promise<RegisterUserResponse> {
-    const { email, password, confirmPassword, firstName, lastName } = registerDto;
+    const {
+      email,
+      password,
+      confirmPassword,
+      firstName,
+      lastName,
+      playdek_name,
+      countryId,
+      cityId,
+      phoneNumber,
+      preferredGamingPlatform,
+      preferredGameDuration
+    } = registerDto;
 
     // Validate password confirmation
     if (password !== confirmPassword) {
@@ -194,41 +225,35 @@ export class AuthService {
     // Hash password
     const hashedPassword = await hash(password, 12);
 
-    // Create full name
-    const fullName = `${firstName} ${lastName}`.trim();
-
-    // Create user with hardcoded defaults for missing required fields
+    // Create user with provided fields and defaults for missing required fields
     const newUser = await this.databaseService.users.create({
       data: {
         email,
         password: hashedPassword,
-        name: fullName,
+        playdek_name: playdek_name,
         first_name: firstName,
         last_name: lastName,
         role_id: 3, // Default to player role
         created_at: new Date(),
         updated_at: new Date(),
-        // Hardcoded defaults for potentially required fields
-        country_id: null, // Will be set to null, can be updated later
-        regional_federation_id: null,
-        city_id: null,
-        phone_number: null,
-        preferred_gaming_platform: null,
-        preferred_game_duration: null,
+        // Use provided fields or defaults
+        country_id: countryId ? BigInt(countryId) : null,
+        city_id: cityId ? BigInt(cityId) : null,
+        phone_number: phoneNumber || null,
+        preferred_gaming_platform: preferredGamingPlatform || null,
+        preferred_game_duration: preferredGameDuration || null,
+        // Defaults for other required fields
         timezone_id: null,
-        email_verified_at: null,
-        remember_token: null,
         last_login_at: null,
       },
     });
 
     // Prepare response
     const userResponse: AuthResponseDto = {
-      name: newUser.name!,
+      name: firstName,
       email: newUser.email!,
       id: newUser.id.toString(),
       role: newUser.role_id || 3,
-      tournaments: [],
     };
 
     return {
@@ -236,5 +261,169 @@ export class AuthService {
       message: 'User registered successfully',
       user: userResponse
     };
+  }
+
+  async requestEmailVerification(email: string): Promise<EmailVerifyResponse> {
+    // Find user by email
+    const user = await this.databaseService.users.findFirst({
+      where: { email },
+      select: { id: true, email: true, first_name: true, email_verified_at: true }
+    });
+
+    if (!user) {
+      // Don't reveal if user exists or not for security
+      return {
+        success: true,
+        message: 'If an account with this email exists, a verification email has been sent.'
+      };
+    }
+
+    // Check if email is already verified
+    if (user.email_verified_at) {
+      return {
+        success: false,
+        message: 'Email is already verified. You can log in to your account.'
+      };
+    }
+
+    // Generate verification token
+    const verificationToken = this.generateEmailVerificationToken(email);
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/email-verify/${verificationToken}`;
+
+    // Get SMTP configuration from environment variables
+    const smtpConfig: SMTPConfig = {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_VERIFY_USER || '',
+      password: process.env.SMTP_VERIFY_PWD || '',
+    };
+
+    // Check if SMTP is configured
+    if (!smtpConfig.host || !smtpConfig.user || !smtpConfig.password) {
+      // Fallback to console logging if SMTP is not configured
+      console.log('📧 EMAIL VERIFICATION REQUEST (SMTP not configured)');
+      console.log('===============================');
+      console.log(`To: ${email}`);
+      console.log(`Name: ${user.first_name || 'User'}`);
+      console.log(`Verification URL: ${verificationUrl}`);
+      console.log('===============================');
+
+      return {
+        success: true,
+        message: 'Verification email sent! Please check your inbox and click the verification link.'
+      };
+    }
+
+    // Send verification email using email service
+    try {
+      const emailSent = await this.emailService.sendVerificationEmail(
+        email,
+        user.first_name || 'User',
+        verificationUrl,
+        smtpConfig
+      );
+
+      if (emailSent) {
+        return {
+          success: true,
+          message: 'Verification email sent! Please check your inbox and click the verification link.'
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to send verification email. Please try again later.'
+        };
+      }
+    } catch (error) {
+      console.error('Email sending error:', error);
+      return {
+        success: false,
+        message: 'Failed to send verification email. Please try again later.'
+      };
+    }
+  }
+
+  async confirmEmailVerification(token: string): Promise<EmailVerifyResponse> {
+    try {
+      // Decrypt and validate the token
+      const decrypted = this.decryptEmailVerificationToken(token);
+      const values = decrypted.split('#');
+
+      if (values.length !== 2) {
+        throw new BadRequestException('Invalid verification token format');
+      }
+
+      const email = values[0];
+      const timestamp = parseInt(values[1]);
+
+      // Check if token is expired (24 hours)
+      const tokenAge = Date.now() - timestamp;
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+      if (tokenAge > maxAge) {
+        return {
+          success: false,
+          message: 'Verification link has expired. Please request a new verification email.'
+        };
+      }
+
+      // Find user by email
+      const user = await this.databaseService.users.findFirst({
+        where: { email },
+        select: { id: true, email: true, email_verified_at: true }
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found. The verification link may be invalid.'
+        };
+      }
+
+      // Check if already verified
+      if (user.email_verified_at) {
+        return {
+          success: true,
+          message: 'Email is already verified. You can log in to your account.'
+        };
+      }
+
+      // Update email_verified_at field with current timestamp
+      await this.databaseService.users.update({
+        where: { email },
+        data: {
+          email_verified_at: new Date().toISOString()
+        }
+      });
+
+      console.log(`✅ Email verified successfully for user: ${email}`);
+
+      return {
+        success: true,
+        message: 'Your email has been successfully verified! You can now log in to your account.'
+      };
+
+    } catch (error) {
+      console.error('Email verification error:', error);
+      return {
+        success: false,
+        message: 'Invalid or expired verification link. Please request a new verification email.'
+      };
+    }
+  }
+
+  private generateEmailVerificationToken(email: string): string {
+    const timestamp = Date.now();
+    const data = `${email}#${timestamp}`;
+    return Buffer.from(data).toString('base64');
+  }
+
+  private decryptEmailVerificationToken(token: string): string {
+    try {
+      return Buffer.from(token, 'base64').toString('utf-8');
+    } catch (error) {
+      throw new BadRequestException('Invalid verification token format');
+    }
   }
 }
