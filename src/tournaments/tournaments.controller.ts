@@ -587,4 +587,23 @@ export class TournamentsController {
       timestamp: new Date().toISOString(),
     };
   }
+
+  @Public()
+  @Post('migrate')
+  async migrateRegistrationUserIds() {
+    try {
+      const result = await this.tournamentsService.migrateRegistrationUserIds();
+      return {
+        success: true,
+        message: 'Migration completed',
+        ...result
+      };
+    } catch (error) {
+      console.error("MIGRATION API Error:", error);
+      throw new HttpException(
+        error.message || 'Migration failed',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
 }

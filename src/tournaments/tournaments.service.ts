@@ -1094,4 +1094,66 @@ console.log("scheduleParsed", scheduleParsed);
     }));
   }
 
+  async migrateRegistrationUserIds(): Promise<{
+    totalRows: number;
+    updatedRows: number;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    let updatedRows = 0;
+
+    // Get all tournament_registration rows with player_email using raw SQL
+    const registrations = await this.databaseService.$queryRaw<
+      Array<{ id: number; player_email: string; userId: bigint | null }>
+    >`SELECT id, player_email, userId FROM tournament_registration WHERE player_email IS NOT NULL`;
+
+    const totalRows = registrations.length;
+    console.log(`Found ${totalRows} registrations with player_email to migrate`);
+
+    for (const registration of registrations) {
+      try {
+        const email = registration.player_email;
+
+        if (!email) {
+          errors.push(`Registration ${registration.id}: No player_email found`);
+          continue;
+        }
+
+        // Find the user by email
+        const user = await this.databaseService.users.findFirst({
+          where: {
+            email: email
+          },
+          select: {
+            id: true
+          }
+        });
+
+        if (!user) {
+          errors.push(`Registration ${registration.id}: No user found for email ${email}`);
+          continue;
+        }
+
+        // Update the userId in tournament_registration
+        await this.databaseService.$executeRaw`
+          UPDATE tournament_registration
+          SET userId = ${user.id}, updated_at = NOW()
+          WHERE id = ${registration.id}
+        `;
+
+        updatedRows++;
+        console.log(`Updated registration ${registration.id}: set userId to ${user.id} (email: ${email})`);
+      } catch (error) {
+        errors.push(`Registration ${registration.id}: ${error.message}`);
+      }
+    }
+
+    console.log(`Migration complete: ${updatedRows}/${totalRows} rows updated`);
+    return {
+      totalRows,
+      updatedRows,
+      errors: errors.slice(0, 50) // Return first 50 errors
+    };
+  }
+
 }
