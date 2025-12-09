@@ -108,20 +108,12 @@ export class UsersService {
       },
     });
 
-    // Get ratings for all users
-    const usersWithRatings = await Promise.all(
-      users.map(async (user) => {
-        const rating = await this.getUserRating(user.id);
-        return {
-          id: user.id.toString(),
-          name: `${user.first_name} ${user.last_name}`,
-          countryCode: user.countries?.tld_code,
-          rating: rating,
-        };
-      })
-    );
-
-    return usersWithRatings;
+    // Map users without rating (rating only available on :id endpoint)
+    return users.map((user) => ({
+      id: user.id.toString(),
+      name: `${user.first_name} ${user.last_name}`,
+      countryCode: user.countries?.tld_code,
+    }));
   }
 
   async getAllUsers({
@@ -254,30 +246,26 @@ export class UsersService {
       ],
     });
 
-    // Get ratings for all users
-    const usersWithRatings = await Promise.all(
-      users.map(async (user) => {
-        const rating = await this.getUserRating(user.id);
-        const result: any = {
-          id: user.id.toString(),
-          name: `${user.first_name} ${user.last_name}`,
-          countryCode: user.countries?.tld_code,
-          rating: rating,
-        };
+    // Map users without rating (rating only available on :id endpoint)
+    const mappedUsers = users.map((user) => {
+      const result: any = {
+        id: user.id.toString(),
+        name: `${user.first_name} ${user.last_name}`,
+        countryCode: user.countries?.tld_code,
+      };
 
-        // Include email if requested and available
-        if (includeEmail && user.email) {
-          result.email = user.email;
-        }
+      // Include email if requested and available
+      if (includeEmail && user.email) {
+        result.email = user.email;
+      }
 
-        return result;
-      })
-    );
+      return result;
+    });
 
     const totalPages = Math.ceil(totalRows / pageSize);
 
     return {
-      results: usersWithRatings,
+      results: mappedUsers,
       totalRows,
       currentPage: page,
       totalPages,
