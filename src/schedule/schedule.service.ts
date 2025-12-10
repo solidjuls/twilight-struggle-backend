@@ -104,7 +104,7 @@ export class ScheduleService {
     const totalRows = await this.databaseService.schedule.count({
       where: where.AND.length > 0 ? where : undefined,
     });
-console.log("totalRows", userToFilter, tournament.map(t => Number(t)));
+
     const scheduleResults = await this.databaseService.schedule.findMany({
       select: {
         game_results: {

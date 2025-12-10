@@ -177,7 +177,7 @@ export class RatingService {
 
       // Get total count from the first result
       const totalRows = results.length > 0 ? Number(results[0].total_players) : 0;
-console.log("totalRows", pageSize, skip, results);
+
       return {
         results: transformedResults,
         totalRows,
