@@ -1,7 +1,7 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["typedSql"]
-  engineType      = "binary"
+  binaryTargets   = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
@@ -13,26 +13,14 @@ datasource db {
 model cities {
   id         BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
   name       String  @db.VarChar(50)
-  latitude   Float   @db.Float
-  longitude  Float   @db.Float
-  province   String? @db.VarChar(100)
   timeZoneId String? @db.VarChar(40)
   users      users[]
 }
 
-model constants {
-  id   Int     @id @default(autoincrement())
-  code String? @db.VarChar(255)
-  text String? @db.VarChar(500)
-}
-
 model countries {
-  id           BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  created_at   DateTime? @db.Timestamp(0)
-  updated_at   DateTime? @db.Timestamp(0)
-  tld_code     String    @db.VarChar(255)
-  country_name String    @db.VarChar(255)
-  icon         String?   @db.VarChar(255)
+  id           BigInt  @id @default(autoincrement()) @db.UnsignedBigInt
+  tld_code     String  @db.VarChar(255)
+  country_name String  @db.VarChar(255)
   users        users[]
 
   @@index([country_name], map: "countries_country_name_index")
@@ -44,7 +32,7 @@ model game_results {
   updated_at                               DateTime?         @db.Timestamp(0)
   usa_player_id                            BigInt            @db.UnsignedBigInt
   ussr_player_id                           BigInt            @db.UnsignedBigInt
-  game_type                                Int?
+  tournament_id                            Int?
   game_code                                String            @db.VarChar(255)
   reported_at                              DateTime          @db.Timestamp(0)
   game_winner                              String            @db.VarChar(255)
@@ -52,26 +40,46 @@ model game_results {
   end_mode                                 String?           @db.VarChar(255)
   game_date                                DateTime          @db.Timestamp(0)
   video1                                   String?           @db.VarChar(255)
-  video2                                   String?           @db.VarChar(255)
-  video3                                   String?           @db.VarChar(255)
   reporter_id                              BigInt?           @db.UnsignedBigInt
   usa_previous_rating                      Int               @default(0)
   ussr_previous_rating                     Int               @default(0)
-  tournaments                              tournaments?      @relation(fields: [game_type], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_game_type_foreign")
+  tournaments                              tournaments?      @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_game_results_tournament_id_foreign")
   users_game_results_reporter_idTousers    users?            @relation("game_results_reporter_idTousers", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_reporter_id_foreign")
   users_game_results_usa_player_idTousers  users             @relation("game_results_usa_player_idTousers", fields: [usa_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_usa_player_id_foreign")
   users_game_results_ussr_player_idTousers users             @relation("game_results_ussr_player_idTousers", fields: [ussr_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_ussr_player_id_foreign")
   ratings_history                          ratings_history[]
-  schedule                                 schedule?
+  schedule                                 schedule[]
 
   @@index([end_mode], map: "game_results_end_mode_index")
   @@index([end_turn], map: "game_results_end_turn_index")
   @@index([game_date], map: "game_results_game_date_index")
-  @@index([game_type], map: "game_results_game_type_index")
   @@index([reported_at], map: "game_results_reported_at_index")
   @@index([reporter_id], map: "game_results_reporter_id_foreign")
   @@index([usa_player_id], map: "game_results_usa_player_id_foreign")
   @@index([ussr_player_id], map: "game_results_ussr_player_id_foreign")
+  @@index([tournament_id], map: "game_results_game_type_index")
+}
+
+model game_results_modified_log {
+  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  gameId               BigInt    @db.UnsignedBigInt
+  created_at           DateTime? @db.Timestamp(0)
+  updated_at           DateTime? @db.Timestamp(0)
+  usa_player_id        BigInt    @db.UnsignedBigInt
+  ussr_player_id       BigInt    @db.UnsignedBigInt
+  game_type            Int?
+  game_code            String    @db.VarChar(255)
+  reported_at          DateTime  @db.Timestamp(0)
+  game_winner          String    @db.VarChar(255)
+  end_turn             Int?      @db.UnsignedInt
+  end_mode             String?   @db.VarChar(255)
+  game_date            DateTime  @db.Timestamp(0)
+  video1               String?   @db.VarChar(255)
+  video2               String?   @db.VarChar(255)
+  video3               String?   @db.VarChar(255)
+  reporter_id          String?   @db.VarChar(255)
+  usa_previous_rating  Int       @default(0)
+  ussr_previous_rating Int       @default(0)
 }
 
 model ratings_history {
@@ -98,42 +106,42 @@ model ratings_history {
   @@index([player_id, created_at], map: "ratings_history_player_id_created_at_index")
 }
 
-model regional_federations {
-  code String @id @db.VarChar(8)
-  name String @db.VarChar(50)
-  icon String @db.VarChar(20)
-}
-
 model users {
-  id                                              BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
-  name                                            String?             @db.VarChar(255)
-  email                                           String?             @unique(map: "users_email_unique") @db.VarChar(255)
-  email_verified_at                               DateTime?           @db.Timestamp(0)
-  password                                        String?             @db.VarChar(255)
-  remember_token                                  String?             @db.VarChar(100)
-  created_at                                      DateTime?           @db.Timestamp(0)
-  updated_at                                      DateTime?           @db.Timestamp(0)
-  country_id                                      BigInt?             @db.UnsignedBigInt
-  first_name                                      String?             @db.VarChar(255)
-  last_name                                       String?             @db.VarChar(255)
-  last_login_at                                   DateTime?           @db.Timestamp(0)
-  regional_federation_id                          String?             @db.VarChar(8)
-  city_id                                         BigInt?             @db.UnsignedBigInt
-  phone_number                                    String?             @db.VarChar(20)
-  preferred_gaming_platform                       String?             @db.VarChar(50)
-  preferred_game_duration                         String?             @db.VarChar(50)
-  timezone_id                                     String?             @db.VarChar(40)
+  id                                              BigInt                    @id @default(autoincrement()) @db.UnsignedBigInt
+  playdek_name                                    String?                   @db.VarChar(255)
+  email                                           String?                   @unique(map: "users_email_unique") @db.VarChar(255)
+  email_verified_at                               String?                   @db.VarChar(50)
+  password                                        String?                   @db.VarChar(255)
+  remember_token                                  String?                   @db.VarChar(100)
+  created_at                                      DateTime?                 @db.Timestamp(0)
+  updated_at                                      DateTime?                 @db.Timestamp(0)
+  country_id                                      BigInt?                   @db.UnsignedBigInt
+  first_name                                      String?                   @db.VarChar(255)
+  last_name                                       String?                   @db.VarChar(255)
+  last_login_at                                   DateTime?                 @db.Timestamp(0)
+  regional_federation_id                          String?                   @db.VarChar(8)
+  city_id                                         BigInt?                   @db.UnsignedBigInt
+  phone_number                                    String?                   @db.VarChar(20)
+  preferred_gaming_platform                       String?                   @db.VarChar(50)
+  preferred_game_duration                         String?                   @db.VarChar(50)
+  timezone_id                                     String?                   @db.VarChar(40)
   role_id                                         Int?
-  game_results_game_results_reporter_idTousers    game_results[]      @relation("game_results_reporter_idTousers")
-  game_results_game_results_usa_player_idTousers  game_results[]      @relation("game_results_usa_player_idTousers")
-  game_results_game_results_ussr_player_idTousers game_results[]      @relation("game_results_ussr_player_idTousers")
+  banned                                          Boolean?
+  game_results_game_results_reporter_idTousers    game_results[]            @relation("game_results_reporter_idTousers")
+  game_results_game_results_usa_player_idTousers  game_results[]            @relation("game_results_usa_player_idTousers")
+  game_results_game_results_ussr_player_idTousers game_results[]            @relation("game_results_ussr_player_idTousers")
+  hall_of_fame_hall_of_fame_winner_idTousers      hall_of_fame[]            @relation("hall_of_fame_winner_idTousers")
+  hall_of_fame_hall_of_fame_second_idTousers      hall_of_fame[]            @relation("hall_of_fame_second_idTousers")
+  hall_of_fame_hall_of_fame_third_idTousers       hall_of_fame[]            @relation("hall_of_fame_third_idTousers")
   ratings_history                                 ratings_history[]
-  schedule_schedule_usa_player_idTousers          schedule[]          @relation("schedule_usa_player_idTousers")
-  schedule_schedule_ussr_player_idTousers         schedule[]          @relation("schedule_ussr_player_idTousers")
+  schedule_schedule_usa_player_idTousers          schedule[]                @relation("schedule_usa_player_idTousers")
+  schedule_schedule_ussr_player_idTousers         schedule[]                @relation("schedule_ussr_player_idTousers")
+  standing_players                                standing_players[]
   tournament_admins                               tournament_admins[]
-  user_game_stats                                 user_game_stats?
-  cities                                          cities?             @relation(fields: [city_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_city_id_foreign")
-  countries                                       countries?          @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_country_id_foreign")
+  tournament_registration                         tournament_registration[]
+  tournament_waitlist                             tournament_waitlist[]
+  cities                                          cities?                   @relation(fields: [city_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_city_id_foreign")
+  countries                                       countries?                @relation(fields: [country_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "users_country_id_foreign")
 
   @@index([city_id], map: "users_city_id_foreign")
   @@index([country_id], map: "users_country_id_foreign")
@@ -147,57 +155,37 @@ model TournamentStatus {
   tournaments tournaments[]
 }
 
-model failed_jobs {
-  id         BigInt   @id @default(autoincrement()) @db.UnsignedBigInt
-  uuid       String   @unique(map: "failed_jobs_uuid_unique") @db.VarChar(255)
-  connection String   @db.Text
-  queue      String   @db.Text
-  payload    String   @db.LongText
-  exception  String   @db.LongText
-  failed_at  DateTime @default(now()) @db.Timestamp(0)
-}
-
-model migrations {
-  id        Int    @id @default(autoincrement()) @db.UnsignedInt
-  migration String @db.VarChar(255)
-  batch     Int
-}
-
-/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
-model password_resets {
-  email      String    @db.VarChar(255)
-  token      String    @db.VarChar(255)
-  created_at DateTime? @db.Timestamp(0)
-
-  @@index([email], map: "password_resets_email_index")
-  @@ignore
-}
-
-model personal_access_tokens {
-  id             BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  tokenable_type String    @db.VarChar(255)
-  tokenable_id   BigInt    @db.UnsignedBigInt
-  name           String    @db.VarChar(255)
-  token          String    @unique(map: "personal_access_tokens_token_unique") @db.VarChar(64)
-  abilities      String?   @db.Text
-  last_used_at   DateTime? @db.Timestamp(0)
-  created_at     DateTime? @db.Timestamp(0)
-  updated_at     DateTime? @db.Timestamp(0)
-
-  @@index([tokenable_type, tokenable_id], map: "personal_access_tokens_tokenable_type_tokenable_id_index")
-}
-
 model tournament_registration {
-  id           Int                             @id @default(autoincrement())
+  id           Int                            @id @default(autoincrement())
   tournamentId Int
-  player_email String?                         @db.VarChar(255)
-  status       tournament_registration_status? @default(pending)
-  created_at   DateTime?                       @default(now()) @db.Timestamp(0)
-  updated_at   DateTime?                       @default(now()) @db.Timestamp(0)
-  tournaments  tournaments                     @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "fk_tournament")
+  status       tournament_registration_status @default(pending)
+  created_at   DateTime?                      @default(now()) @db.Timestamp(0)
+  updated_at   DateTime?                      @default(now()) @db.Timestamp(0)
+  player_email String?                        @db.VarChar(255)
+  userId       BigInt?                        @db.UnsignedBigInt
+  tournaments  tournaments                    @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "fk_tournament")
+  users        users?                         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_tournament_registration_userId_foreign")
 
+  @@unique([player_email, tournamentId], map: "unique_player_tournament")
   @@index([tournamentId], map: "fk_tournament")
-  @@index([player_email], map: "fk_users_id")
+  @@index([userId], map: "fk_tournament_registration_userId_foreign")
+}
+
+model tournament_waitlist {
+  id           Int                        @id @default(autoincrement()) @db.UnsignedInt
+  tournamentId Int
+  userId       BigInt                     @db.UnsignedBigInt
+  position     Int?                       @db.UnsignedInt
+  status       tournament_waitlist_status @default(waiting)
+  created_at   DateTime?                  @default(now()) @db.Timestamp(0)
+  updated_at   DateTime?                  @default(now()) @db.Timestamp(0)
+  tournaments  tournaments                @relation(fields: [tournamentId], references: [id], onDelete: Cascade, map: "fk_tournament_waitlist")
+  users        users                      @relation(fields: [userId], references: [id], onDelete: Cascade, map: "fk_tournament_waitlist_user")
+
+  @@unique([tournamentId, userId], map: "unique_tournament_user_waitlist")
+  @@index([tournamentId], map: "fk_tournament_waitlist")
+  @@index([userId], map: "fk_tournament_waitlist_user")
+  @@index([tournamentId, position], map: "tournament_waitlist_position_index")
 }
 
 model tournaments {
@@ -206,54 +194,17 @@ model tournaments {
   status_id               Int
   created_at              DateTime?                 @default(now()) @db.Timestamp(0)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
-  description             String?                   @db.VarChar(100)
+  description             String?                   @db.VarChar(255)
   starting_date           DateTime?                 @db.Date
+  waitlist                Boolean                   @default(false)
   game_results            game_results[]
   schedule                schedule[]
-  standings               standings[]
   tournament_admins       tournament_admins[]
   tournament_registration tournament_registration[]
+  tournament_waitlist     tournament_waitlist[]
   TournamentStatus        TournamentStatus          @relation(fields: [status_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tournaments_TournamentStatus_FK")
 
   @@index([status_id], map: "tournaments_TournamentStatus_FK")
-}
-
-model user_game_stats {
-  player_id      BigInt    @id @db.UnsignedBigInt
-  created_at     DateTime? @db.Timestamp(0)
-  updated_at     DateTime? @db.Timestamp(0)
-  rating         Int       @default(5000)
-  total_games    Int       @default(0)
-  friendly_games Int       @default(0)
-  usa_victories  Int       @default(0)
-  usa_losses     Int       @default(0)
-  usa_ties       Int       @default(0)
-  ussr_victories Int       @default(0)
-  ussr_losses    Int       @default(0)
-  ussr_ties      Int       @default(0)
-  users          users     @relation(fields: [player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "user_game_stats_player_id_foreign")
-}
-
-model game_results_modified_log {
-  id                   BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
-  gameId               BigInt    @db.UnsignedBigInt
-  created_at           DateTime? @db.Timestamp(0)
-  updated_at           DateTime? @db.Timestamp(0)
-  usa_player_id        BigInt    @db.UnsignedBigInt
-  ussr_player_id       BigInt    @db.UnsignedBigInt
-  game_type            Int?
-  game_code            String    @db.VarChar(255)
-  reported_at          DateTime  @db.Timestamp(0)
-  game_winner          String    @db.VarChar(255)
-  end_turn             Int?      @db.UnsignedInt
-  end_mode             String?   @db.VarChar(255)
-  game_date            DateTime  @db.Timestamp(0)
-  video1               String?   @db.VarChar(255)
-  video2               String?   @db.VarChar(255)
-  video3               String?   @db.VarChar(255)
-  reporter_id          String?   @db.VarChar(255)
-  usa_previous_rating  Int       @default(0)
-  ussr_previous_rating Int       @default(0)
 }
 
 model schedule {
@@ -263,7 +214,7 @@ model schedule {
   usa_player_id                        BigInt?       @db.UnsignedBigInt
   ussr_player_id                       BigInt?       @db.UnsignedBigInt
   due_date                             DateTime      @db.Date
-  game_results_id                      BigInt?       @unique(map: "unique_game_results_id") @db.UnsignedBigInt
+  game_results_id                      BigInt?       @db.UnsignedBigInt
   created_at                           DateTime?     @default(now()) @db.Timestamp(0)
   updated_at                           DateTime?     @default(now()) @db.Timestamp(0)
   tournaments                          tournaments   @relation(fields: [tournaments_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_1")
@@ -274,6 +225,7 @@ model schedule {
   @@index([tournaments_id], map: "tournaments_id")
   @@index([usa_player_id], map: "usa_player_id")
   @@index([ussr_player_id], map: "ussr_player_id")
+  @@index([game_results_id], map: "game_results_id")
 }
 
 model tournament_admins {
@@ -290,19 +242,41 @@ model standing_players {
   standing_id Int
   user_id     BigInt    @db.UnsignedBigInt
   standings   standings @relation(fields: [standing_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_standing_players_standing")
+  users       users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_standing_players_user_id_foreign")
 
   @@id([standing_id, user_id])
+  @@index([user_id], map: "fk_standing_players_user_id_foreign")
 }
 
 model standings {
   id               Int                @id @default(autoincrement())
   tournaments_id   Int
   standing_name    String             @db.VarChar(255)
-  secondary_name   String?            @db.VarChar(255)
+  secondary_name   String             @db.VarChar(255)
   standing_players standing_players[]
-  tournaments      tournaments        @relation(fields: [tournaments_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "standings_ibfk_1")
+}
 
-  @@index([tournaments_id], map: "tournaments_id")
+model hall_of_fame {
+  id                                  BigInt    @id @default(autoincrement()) @db.UnsignedBigInt
+  season                              String    @db.VarChar(20)
+  league_type                         String    @db.VarChar(50)
+  link                                String?   @db.VarChar(255)
+  players                             Int?
+  winner_id                           BigInt    @db.UnsignedBigInt
+  second_id                           BigInt?   @db.UnsignedBigInt
+  third_id                            BigInt?   @db.UnsignedBigInt
+  flag1                               String?   @db.Char(2)
+  flag2                               String?   @db.Char(2)
+  flag3                               String?   @db.Char(2)
+  created_at                          DateTime? @default(now()) @db.DateTime(0)
+  updated_at                          DateTime? @default(now()) @db.DateTime(0)
+  users_hall_of_fame_winner_idTousers users     @relation("hall_of_fame_winner_idTousers", fields: [winner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hall_of_fame_ibfk_1")
+  users_hall_of_fame_second_idTousers users?    @relation("hall_of_fame_second_idTousers", fields: [second_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hall_of_fame_ibfk_2")
+  users_hall_of_fame_third_idTousers  users?    @relation("hall_of_fame_third_idTousers", fields: [third_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hall_of_fame_ibfk_3")
+
+  @@index([second_id], map: "hall_of_fame_ibfk_2")
+  @@index([third_id], map: "hall_of_fame_ibfk_3")
+  @@index([winner_id], map: "winner_id")
 }
 
 enum tournament_registration_status {
@@ -311,4 +285,11 @@ enum tournament_registration_status {
   pending
   waiting
   forfeited
+}
+
+enum tournament_waitlist_status {
+  waiting
+  active
+  invited
+  removed
 }

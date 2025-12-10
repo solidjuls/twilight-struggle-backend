@@ -5,14 +5,19 @@
   "author": "",
   "private": true,
   "license": "MIT",
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
+    "prebuild": "prisma generate --sql",
     "build": "nest build",
+    "postinstall": "prisma generate --sql",
+    "vercel-build": "prisma generate --sql && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "vercel-build": "npm run build",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -29,9 +34,13 @@
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.1.6",
     "@prisma/client": "^6.17.1",
+    "@types/bcrypt": "^6.0.0",
+    "@types/nodemailer": "^7.0.4",
+    "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
+    "nodemailer": "^7.0.11",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -44,8 +53,9 @@
     "@types/node": "^24.7.2",
     "@types/passport-jwt": "^4.0.1",
     "nodemon": "^3.1.10",
-    "prisma": "^6.17.1",
+    "prisma": "6.19.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
-  }
+  },
+  "packageManager": "yarn@4.9.4+sha512.7b1cb0b62abba6a537b3a2ce00811a843bea02bcf53138581a6ae5b1bf563f734872bd47de49ce32a9ca9dcaff995aa789577ffb16811da7c603dcf69e73750b"
 }

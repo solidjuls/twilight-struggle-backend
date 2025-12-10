@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Res, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
-import { LoginDto, ResetPasswordDto, CreateUserDto, RegisterUserDto } from './dto/auth.dto';
+import { LoginDto, ImpersonateDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, EmailVerifyRequestDto, EmailVerifyConfirmDto } from './dto/auth.dto';
 import { Public, CurrentUser } from './decorators/auth.decorators';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -51,6 +51,24 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post('impersonate')
+  @HttpCode(HttpStatus.OK)
+  async impersonate(@Body() impersonateDto: ImpersonateDto, @CurrentUser() user: any, @Res({ passthrough: true }) response: Response) {
+    const { user: impersonatedUser, token } = await this.authService.impersonate(impersonateDto.email, user);
+
+    // Set HTTP-only cookie
+    response.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV !== 'development',
+      sameSite: 'strict',
+      maxAge: 8640000, // 100 days in seconds
+      path: '/',
+    });
+
+    return impersonatedUser;
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   async getProfile(@CurrentUser() user: any) {
     return {
@@ -58,8 +76,6 @@ export class AuthController {
       email: user.mail,
       name: user.name,
       role: user.role,
-      tournamentsAdmin: user.tournamentsAdmin,
-      tournamentsRegistered: user.tournamentsRegistered,
     };
   }
 
@@ -90,6 +106,20 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async createUser(@Body() createUserDto: CreateUserDto) {
     return this.authService.createUser(createUserDto);
+  }
+
+  @Public()
+  @Post('email-verify')
+  @HttpCode(HttpStatus.OK)
+  async requestEmailVerification(@Body() body: { email: string }) {
+    return this.authService.requestEmailVerification(body.email);
+  }
+
+  @Public()
+  @Post('email-verify/confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmEmailVerification(@Body() body: { token: string }) {
+    return this.authService.confirmEmailVerification(body.token);
   }
 
   @Public()

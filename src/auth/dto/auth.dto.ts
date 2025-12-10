@@ -3,12 +3,15 @@ export interface LoginDto {
   pwd: string;
 }
 
+export interface ImpersonateDto {
+  email: string;
+}
+
 export interface AuthResponseDto {
   name: string;
   email: string;
   id: string;
   role: number;
-  tournaments: number[];
 }
 
 export interface JwtPayloadDto {
@@ -16,19 +19,15 @@ export interface JwtPayloadDto {
   name: string;
   role: number;
   id: string;
-  tournamentsAdmin: number[];
-  tournamentsRegistered: number[];
   iat?: number;
   exp?: number;
 }
 
 export interface UserFromTokenDto {
   id: number;
-  name: string;
+  playdek_name: string;
   mail: string;
   role: number;
-  tournamentsAdmin: number[];
-  tournamentsRegistered: number[];
 }
 
 export interface ResetPasswordDto {
@@ -40,7 +39,7 @@ export interface ResetPasswordDto {
 export interface CreateUserDto {
   email: string;
   password: string;
-  name: string;
+  playdek_name: string;
   first_name?: string;
   last_name?: string;
   role_id?: number;
@@ -52,6 +51,12 @@ export interface RegisterUserDto {
   confirmPassword: string;
   firstName: string;
   lastName: string;
+  playdek_name: string;
+  countryId?: string;
+  cityId?: string;
+  phoneNumber?: string;
+  preferredGamingPlatform?: string;
+  preferredGameDuration?: string;
 }
 
 export interface RegisterUserResponse {
@@ -62,6 +67,18 @@ export interface RegisterUserResponse {
     email: string;
     id: string;
     role: number;
-    tournaments: number[];
   };
+}
+
+export interface EmailVerifyRequestDto {
+  email: string;
+}
+
+export interface EmailVerifyConfirmDto {
+  token: string;
+}
+
+export interface EmailVerifyResponse {
+  success: boolean;
+  message: string;
 }
