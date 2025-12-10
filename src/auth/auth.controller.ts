@@ -5,6 +5,8 @@ import { LoginDto, ImpersonateDto, ResetPasswordDto, CreateUserDto, RegisterUser
 import { Public, CurrentUser } from './decorators/auth.decorators';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+const isProductionOrVercel = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -18,8 +20,8 @@ export class AuthController {
     // Set HTTP-only cookie
     response.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
+      secure: isProductionOrVercel,
+      sameSite: isProductionOrVercel ? 'none' : 'lax',
       maxAge: 8640000, // 100 days in seconds
       path: '/',
     });
@@ -34,8 +36,8 @@ export class AuthController {
     // Clear the token cookie
     response.cookie('token', '', {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
+      secure: isProductionOrVercel,
+      sameSite: isProductionOrVercel ? 'none' : 'lax',
       expires: new Date(0),
       path: '/',
     });
@@ -59,8 +61,8 @@ export class AuthController {
     // Set HTTP-only cookie
     response.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
+      secure: isProductionOrVercel,
+      sameSite: isProductionOrVercel ? 'none' : 'lax',
       maxAge: 8640000, // 100 days in seconds
       path: '/',
     });
