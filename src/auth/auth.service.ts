@@ -37,6 +37,15 @@ export class AuthService {
       });
     }
 
+    // Check if user is banned (treat as unverified)
+    if (user.banned) {
+      throw new UnauthorizedException({
+        message: 'Email not verified',
+        code: 'EMAIL_NOT_VERIFIED',
+        error: 'Your email address has not been verified. Please check your email and verify your account before logging in.'
+      });
+    }
+
     if (!user.password) {
       console.log("password")
       throw new UnauthorizedException('The password is incorrect');

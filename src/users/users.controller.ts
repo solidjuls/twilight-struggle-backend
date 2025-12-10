@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Body,
   Query,
   Param,
@@ -23,6 +24,7 @@ import {
   CreateUserDto,
   UpdateUserDto,
   UpdatePasswordDto,
+  BanUserDto,
 } from './dto/users.dto';
 
 @Controller('users')
@@ -194,6 +196,45 @@ export class UsersController {
       return { message: 'Password updated successfully' };
     } catch (error) {
       console.error('[Users POST update-password]', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Patch(':id/ban')
+  async banUser(
+    @Param('id') id: string,
+    @Body() banData: BanUserDto,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    try {
+      // Check if user has admin privileges (role_id 1 = SUPERADMIN, 2 = ADMIN)
+      if (user.role !== 1 && user.role !== 2) {
+        throw new HttpException(
+          'Insufficient privileges to ban/unban users',
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
+      const result = await this.usersService.banUser(id, banData.banned);
+
+      if (!result.success) {
+        throw new HttpException(
+          result.error || 'Failed to update user ban status',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      return {
+        message: banData.banned ? 'User banned successfully' : 'User unbanned successfully'
+      };
+    } catch (error) {
+      console.error('[Users PATCH ban]', error);
       if (error instanceof HttpException) {
         throw error;
       }

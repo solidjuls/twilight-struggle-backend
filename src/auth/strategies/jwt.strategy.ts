@@ -42,7 +42,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         email: true,
         email_verified_at: true,
         first_name: true,
-        role_id: true
+        role_id: true,
+        banned: true
       }
     });
 
@@ -56,6 +57,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     // Check if email is still verified
     if (!user.email_verified_at) {
+      throw new UnauthorizedException({
+        message: 'Email not verified',
+        code: 'EMAIL_NOT_VERIFIED',
+        error: 'Your email address is not verified. Please verify your email to continue using the application.'
+      });
+    }
+
+    // Check if user is banned (treat as unverified)
+    if (user.banned) {
       throw new UnauthorizedException({
         message: 'Email not verified',
         code: 'EMAIL_NOT_VERIFIED',

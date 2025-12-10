@@ -393,4 +393,27 @@ export class UsersService {
       return { success: false, error: 'Failed to update password' };
     }
   }
+
+  async banUser(userId: string, banned: boolean): Promise<{ success: boolean; error?: string }> {
+    try {
+      const user = await this.databaseService.users.findFirst({
+        where: { id: BigInt(userId) },
+        select: { id: true },
+      });
+
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      await this.databaseService.users.update({
+        where: { id: BigInt(userId) },
+        data: { banned },
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating user ban status:', error);
+      return { success: false, error: 'Failed to update user ban status' };
+    }
+  }
 }
