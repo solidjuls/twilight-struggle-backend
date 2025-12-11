@@ -20,8 +20,8 @@ export class AuthController {
     // Set HTTP-only cookie
     response.cookie('token', token, {
       httpOnly: true,
-      secure: isProductionOrVercel,
-      sameSite: isProductionOrVercel ? 'none' : 'lax',
+      secure: true, //isProductionOrVercel,
+      sameSite: 'none',//isProductionOrVercel ? 'none' : 'lax',
       maxAge: 8640000, // 100 days in seconds
       path: '/',
     });
@@ -36,8 +36,8 @@ export class AuthController {
     // Clear the token cookie
     response.cookie('token', '', {
       httpOnly: true,
-      secure: isProductionOrVercel,
-      sameSite: isProductionOrVercel ? 'none' : 'lax',
+      secure: true, //isProductionOrVercel,
+      sameSite: 'none',//isProductionOrVercel ? 'none' : 'lax',
       expires: new Date(0),
       path: '/',
     });
@@ -61,8 +61,8 @@ export class AuthController {
     // Set HTTP-only cookie
     response.cookie('token', token, {
       httpOnly: true,
-      secure: isProductionOrVercel,
-      sameSite: isProductionOrVercel ? 'none' : 'lax',
+      secure: true, //isProductionOrVercel,
+      sameSite: 'none',//isProductionOrVercel ? 'none' : 'lax',
       maxAge: 8640000, // 100 days in seconds
       path: '/',
     });

@@ -31,7 +31,6 @@ async function bootstrap() {
 
   // Enable CORS for frontend communication
   app.enableCors({
-    origin: ({
     // The origin function checks the incoming origin against our allowed list and regex.
     origin: (origin, callback) => {
       // Allow requests with no origin (like mobile apps or server-to-server calls)
