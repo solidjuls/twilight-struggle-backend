@@ -26,7 +26,7 @@ async function bootstrap() {
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
     : ['http://localhost:3000', 'http://localhost:3001'];
 
-  const vercelDomainRegex = /^https?:\/\/(?:[a-zA-Z0-9-]+\.vercel\.app|vercel\.app)$/i;
+  const vercelDomainRegex = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*vercel\.app$/i;
 
 
   // Enable CORS for frontend communication
