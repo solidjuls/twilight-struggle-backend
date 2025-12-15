@@ -76,6 +76,16 @@ export class AuthService {
       throw new UnauthorizedException("User doesn't exist.");
     }
 
+    // Check if user's email is verified
+    if (!user.email_verified_at) {
+      throw new UnauthorizedException("Cannot impersonate user: email not verified.");
+    }
+
+    // Check if user is banned
+    if (user.banned) {
+      throw new UnauthorizedException("Cannot impersonate user: user is banned.");
+    }
+
     return this.generateAuthResponse(user);
   }
 
