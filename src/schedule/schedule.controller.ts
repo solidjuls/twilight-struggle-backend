@@ -125,7 +125,6 @@ export class ScheduleController {
       const validOrderDirection = ['asc', 'desc'];
       const finalOrderDirection = validOrderDirection.includes(orderDirection) ? orderDirection : 'asc';
 
-console.log("parsedTournamentIds", parsedUserId, parsedTournamentIds);
       const result = await this.scheduleService.getSchedules({
         userId: parsedUserId,
         tournament: parsedTournamentIds,
