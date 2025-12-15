@@ -27,10 +27,26 @@ export class GamesService {
     }
 
     if (filter.userFilter && filter.userFilter.length > 0) {
-      prismaFilter.OR = [
-        { usa_player_id: { in: filter.userFilter.map(id => BigInt(id)) } },
-        { ussr_player_id: { in: filter.userFilter.map(id => BigInt(id)) } },
-      ];
+      if (filter.userFilter.length === 1) {
+        // Single user: return all games for that user
+        prismaFilter.OR = [
+          { usa_player_id: BigInt(filter.userFilter[0]) },
+          { ussr_player_id: BigInt(filter.userFilter[0]) },
+        ];
+      } else if (filter.userFilter.length === 2) {
+        // Two users: return games played between these 2 users
+        const [user1, user2] = filter.userFilter.map(id => BigInt(id));
+        prismaFilter.OR = [
+          { usa_player_id: user1, ussr_player_id: user2 },
+          { usa_player_id: user2, ussr_player_id: user1 },
+        ];
+      } else {
+        // More than 2 users: return all games where any of these users played
+        prismaFilter.OR = [
+          { usa_player_id: { in: filter.userFilter.map(id => BigInt(id)) } },
+          { ussr_player_id: { in: filter.userFilter.map(id => BigInt(id)) } },
+        ];
+      }
     }
 
     if (filter.toFilter && filter.toFilter.length > 0) {
@@ -501,7 +517,24 @@ export class GamesService {
           await this.addGameToLogTable(prismaTransaction, oldGameDate, emailReporter);
           console.log('oldGameDate', oldGameDate);
 
-          // Check if only metadata changed (no rating recalculation needed)
+          // Update schedule table to unlink the game result
+          await prismaTransaction.schedule.updateMany({
+            where: {
+              game_results_id: BigInt(input.oldId),
+            },
+            data: {
+              game_results_id: null,
+            },
+          });
+
+          // Delete ratings_history for the game being deleted
+          await prismaTransaction.ratings_history.deleteMany({
+            where: {
+              game_result_id: BigInt(input.oldId),
+            },
+          });
+
+          // Delete the game
           const gameDeleted = await prismaTransaction.game_results.delete({
             where: {
               id: Number(input.oldId),
