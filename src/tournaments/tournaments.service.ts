@@ -316,6 +316,11 @@ export class TournamentsService {
     const adminTournaments = await this.databaseService.tournament_admins.findMany({
       where: {
         userId: BigInt(userId),
+        tournaments: {
+          status_id: {
+            in: [1, 2, 3, 4]
+          }
+        }
       },
       include: {
         tournaments: {

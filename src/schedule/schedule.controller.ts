@@ -51,25 +51,20 @@ export class ScheduleController {
         onlyPending,
         orderBy = 'dueDate',
         orderDirection = 'asc',
-        // Legacy parameters for backward compatibility
-        uid,
-        u: userFilter,
-        p,
-        pso,
-        a,
+        a = '0',
       } = query;
 
       // Use new parameters if available, otherwise fall back to legacy
-      const finalUserId = userId || uid;
-      const finalPage = page || p || '1';
-      const finalPageSize = pageSize || pso || '20';
+      const finalUserId = userId || user.id.toString();
+      const finalPage = page || '1';
+      const finalPageSize = pageSize || '20';
 
       // Get user's registered tournaments first
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
-
+      const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
+    
       // Parse parameters
       const parsedUserId = finalUserId ? Number(finalUserId) : undefined;
-      const parsedUserFilter = userFilter ? Number(userFilter) : undefined;
       const parsedPage = Number(finalPage);
       const parsedPageSize = Number(finalPageSize);
       const parsedOnlyPending = onlyPending === 'true';
@@ -117,6 +112,13 @@ export class ScheduleController {
         }
       }
 
+            // Find if user is admin of tournamentId
+      const userIsAdmin = userAdminTournaments.some(t => t.id === parsedTournamentIds[0]);
+
+      if (userId && !userIsAdmin && userId !== user.id.toString()) {
+        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
+      }
+
       // Validate orderBy parameter
       const validOrderBy = ['dueDate', 'gameDate', 'tournamentName'];
       const finalOrderBy = validOrderBy.includes(orderBy) ? orderBy : 'dueDate';
@@ -128,7 +130,6 @@ export class ScheduleController {
       const result = await this.scheduleService.getSchedules({
         userId: parsedUserId,
         tournament: parsedTournamentIds,
-        userFilter: parsedUserFilter,
         page: parsedPage,
         pageSize: parsedPageSize,
         adminView,

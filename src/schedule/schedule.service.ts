@@ -21,7 +21,6 @@ export class ScheduleService {
   async getSchedules({
     userId,
     tournament,
-    userFilter,
     page,
     pageSize,
     adminView,
@@ -31,7 +30,6 @@ export class ScheduleService {
   }: {
     userId?: number;
     tournament?: string[] | undefined;
-    userFilter?: number | undefined;
     page: number;
     pageSize: number;
     adminView: boolean;
@@ -41,7 +39,6 @@ export class ScheduleService {
   }): Promise<ScheduleListResponse> {
     pageSize = pageSize || 20;
     const skip = (page - 1) * pageSize;
-    const userToFilter = userFilter || userId;
 
     const where: any = {
       AND: []
@@ -53,13 +50,12 @@ export class ScheduleService {
         tournaments_id: { in: tournament.map(t => Number(t)) }
       });
     }
-
     // Add user filter if not admin view or if specific user is requested
-    if (userToFilter && (!adminView || userFilter)) {
+    if (!adminView && userId) {
       where.AND.push({
         OR: [
-          { usa_player_id: userToFilter },
-          { ussr_player_id: userToFilter },
+          { usa_player_id: userId },
+          { ussr_player_id: userId },
         ],
       });
     }
