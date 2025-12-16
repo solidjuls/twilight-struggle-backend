@@ -126,6 +126,8 @@ export class TournamentsService {
             email: true,
             first_name: true,
             last_name: true,
+            phone_number: true,
+            playdek_name: true,
             countries: {
               select: {
                 tld_code: true,
@@ -143,6 +145,8 @@ export class TournamentsService {
       return {
         registrationId: registration.id,
         email: isAdmin ? (user?.email || '') : '',
+        phoneNumber: isAdmin ? (user?.phone_number || '') : '',
+        playdekName: user?.playdek_name,
         registeredAt: registration.created_at || new Date(),
         userId: user?.id?.toString(),
         name: user ? `${user.first_name} ${user.last_name}` : 'Unknown User',
@@ -152,11 +156,6 @@ export class TournamentsService {
   }
 
   async isUserAdminForTournament(userRole?: number, userId?: string, tournamentId?: number): Promise<boolean> {
-    // Check if user is global admin (SUPERADMIN = 1 or ADMIN = 2)
-    if (userRole === 1 || userRole === 2) {
-      return true;
-    }
-
     // Check if user is tournament-specific admin
     if (userId && tournamentId) {
       try {
