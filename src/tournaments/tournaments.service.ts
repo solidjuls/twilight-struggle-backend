@@ -119,7 +119,6 @@ export class TournamentsService {
       select: {
         id: true,
         userId: true,
-        status: true,
         created_at: true,
         users: {
           select: {
@@ -137,16 +136,13 @@ export class TournamentsService {
       }
     });
 
-    // Check if user is admin (global admin or tournament admin)
     const isAdmin = await this.isUserAdminForTournament(userRole, userId, tournamentId);
 
-    // Map registration data with user data
     return registrations.map(registration => {
       const user = registration.users;
       return {
         registrationId: registration.id,
-        email: isAdmin ? (user?.email || '') : '', // Only include email for admins
-        status: registration.status || '',
+        email: isAdmin ? (user?.email || '') : '',
         registeredAt: registration.created_at || new Date(),
         userId: user?.id?.toString(),
         name: user ? `${user.first_name} ${user.last_name}` : 'Unknown User',

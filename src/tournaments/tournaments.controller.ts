@@ -27,11 +27,15 @@ import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/auth.decorators';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { JwtPayloadDto } from '../auth/dto/auth.dto';
+import { UsersService } from 'src/users/users.service';
 
 @Controller('tournaments')
 @UseGuards(JwtAuthGuard)
 export class TournamentsController {
-  constructor(private readonly tournamentsService: TournamentsService) {}
+  constructor(
+    private readonly tournamentsService: TournamentsService,
+    private readonly userService: UsersService
+  ) {}
 
   @Get()
   @Public()
@@ -45,12 +49,21 @@ export class TournamentsController {
           user?.role,
           user?.id?.toString()
         );
-        return registeredPlayers;
+        // add the rating for each registered user
+        const registeredPlayersWithRating = await Promise.all(
+          registeredPlayers.map(async (player) => {
+            const rating = await this.userService.getUserRating(BigInt(player.userId));
+            return {
+              ...player,
+              rating
+            };
+          })
+        );
+        return registeredPlayersWithRating;
       }
 
       // Get tournaments by ID(s)
       if (typeof id === "string") {
-        console.log("(userId, tournamentId) ", id);
         const tournaments: TournamentDto[] = await this.tournamentsService.getTournamentsById(id.split(','));
         return tournaments;
       }

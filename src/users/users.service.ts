@@ -223,7 +223,7 @@ export class UsersService {
     };
   }
 
-  private async getUserRating(userId: bigint): Promise<number | undefined> {
+  public async getUserRating(userId: bigint): Promise<number | undefined> {
     try {
       // Get the latest rating for the user
       const rating = await this.databaseService.ratings_history.findFirst({
