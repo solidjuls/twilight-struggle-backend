@@ -43,7 +43,7 @@ export class ScheduleService {
     const where: any = {
       AND: []
     };
-    
+
     // Add tournament filter if provided
     if (tournament && tournament.length > 0) {
       where.AND.push({
@@ -327,59 +327,21 @@ export class ScheduleService {
 
   async uploadCsvSchedule(data: UploadCsvScheduleDto): Promise<{ created: number; errors: string[] }> {
     const { file, tournament } = data;
-    const errors: string[] = [];
-    let created = 0;
+    const tournamentId = parseInt(tournament);
 
-    // Validate tournament exists
-    const tournamentExists = await this.databaseService.tournaments.findUnique({
-      where: { id: parseInt(tournament) }
+    const scheduleData = file.map((row) => ({
+      due_date: new Date(row.due_date),
+      game_code: row.game_code,
+      tournaments_id: tournamentId,
+      usa_player_id: BigInt(row.usa_player_id),
+      ussr_player_id: BigInt(row.ussr_player_id),
+    }));
+
+    // Bulk insert all records at once
+    const result = await this.databaseService.schedule.createMany({
+      data: scheduleData,
     });
 
-    if (!tournamentExists) {
-      throw new Error(`Tournament with ID ${tournament} not found`);
-    }
-
-    for (const [index, row] of file.entries()) {
-      try {
-        // Validate user IDs exist
-        const usaPlayerId = BigInt(row.usa_player_id);
-        const ussrPlayerId = BigInt(row.ussr_player_id);
-
-        const usaPlayer = await this.databaseService.users.findUnique({
-          where: { id: usaPlayerId }
-        });
-
-        const ussrPlayer = await this.databaseService.users.findUnique({
-          where: { id: ussrPlayerId }
-        });
-
-        if (!usaPlayer) {
-          errors.push(`Row ${index + 2}: USA player with ID ${row.usa_player_id} not found`);
-          continue;
-        }
-
-        if (!ussrPlayer) {
-          errors.push(`Row ${index + 2}: USSR player with ID ${row.ussr_player_id} not found`);
-          continue;
-        }
-
-        // Create schedule entry using tournament parameter instead of CSV field
-        await this.databaseService.schedule.create({
-          data: {
-            due_date: new Date(row.due_date),
-            game_code: row.game_code,
-            tournaments_id: parseInt(tournament),
-            usa_player_id: usaPlayerId,
-            ussr_player_id: ussrPlayerId,
-          }
-        });
-
-        created++;
-      } catch (error) {
-        errors.push(`Row ${index + 2}: ${error.message}`);
-      }
-    }
-
-    return { created, errors };
+    return { created: result.count, errors: [] };
   }
 }

@@ -126,7 +126,6 @@ export class ScheduleController {
       // Validate orderDirection parameter
       const validOrderDirection = ['asc', 'desc'];
       const finalOrderDirection = validOrderDirection.includes(orderDirection) ? orderDirection : 'asc';
-
       const result = await this.scheduleService.getSchedules({
         userId: parsedUserId,
         tournament: parsedTournamentIds,
@@ -138,7 +137,6 @@ export class ScheduleController {
         orderDirection: finalOrderDirection,
       });
 
-      
       return {
         ...result,
         userTournaments,
