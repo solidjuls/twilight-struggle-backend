@@ -259,13 +259,9 @@ export class TournamentsService {
   }
 
   async getUserRegisteredTournaments(userId: string): Promise<TournamentDto[]> {
-    // Get tournaments where user is registered
     const registrations = await this.databaseService.tournament_registration.findMany({
       where: {
         userId: BigInt(userId),
-        status: {
-          in: ['accepted', 'pending'] // Only include active registrations
-        }
       },
       include: {
         tournaments: {

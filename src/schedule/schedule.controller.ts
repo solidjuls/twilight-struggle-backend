@@ -61,6 +61,7 @@ export class ScheduleController {
 
       // Get user's registered tournaments first
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
+      const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
     
       // Parse parameters
@@ -76,13 +77,13 @@ export class ScheduleController {
       if (tournamentId) {
         // Use provided tournament ID(s)
         parsedTournamentIds = tournamentId.split(',');
-      } else if (userTournaments.length > 0) {
+      } else if (ongoingUserTournaments.length > 0) {
         // No tournament provided, select default from user tournaments
         // Prioritize ongoing tournaments (status_id = 4), then any other tournament
-        const ongoingTournaments = userTournaments.filter(t => t.status_id === 4);
+        const ongoingTournaments = ongoingUserTournaments.filter(t => t.status_id === 4);
         const defaultTournament = ongoingTournaments.length > 0
           ? ongoingTournaments[0]
-          : userTournaments[0];
+          : ongoingUserTournaments[0];
 
         parsedTournamentIds = [defaultTournament.id];
       } else {
@@ -92,21 +93,21 @@ export class ScheduleController {
           totalRows: 0,
           currentPage: parsedPage,
           totalPages: 0,
-          userTournaments,
+          userTournaments: ongoingUserTournaments,
           defaultTournament: '',
         };
       }
 
       // validate tournament is open for non-admin view
       if (finalUserId) {
-        const openTournament = userTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
+        const openTournament = ongoingUserTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
         if (openTournament.length === 0) {
           return {
             results: [],
             totalRows: 0,
             currentPage: parsedPage,
             totalPages: 0,
-            userTournaments,
+            userTournaments: ongoingUserTournaments,
             defaultTournament: parsedTournamentIds[0],
           };
         }
@@ -137,9 +138,18 @@ export class ScheduleController {
         orderDirection: finalOrderDirection,
       });
 
+      result.results.sort((a, b) => {
+        if (a.gameResultsId === null && b.gameResultsId !== null) {
+          return -1;
+        }
+        if (a.gameResultsId !== null && b.gameResultsId === null) {
+          return 1;
+        }
+        return 0;
+      });
       return {
         ...result,
-        userTournaments,
+        userTournaments: ongoingUserTournaments,
         defaultTournament: parsedTournamentIds[0],
       };
     } catch (error) {
