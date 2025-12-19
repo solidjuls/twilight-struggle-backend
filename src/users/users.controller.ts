@@ -87,7 +87,6 @@ export class UsersController {
   }
 
   @Get(':id')
-  @Public()
   async getUserById(
     @Param('id') id: string,
   ): Promise<UserDetailDto> {

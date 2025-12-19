@@ -15,7 +15,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getHandler(),
       context.getClass(),
     ]);
-console.log("canActivate", isPublic)
+
     if (isPublic) {
       // For public routes, try to authenticate but don't fail if no token
       return super.canActivate(context);
@@ -35,9 +35,16 @@ console.log("canActivate", isPublic)
       // For public routes, return user if available, otherwise return undefined
       return user || undefined;
     }
-    console.log("handleRequest", isPublic, user, err)
+
     // For protected routes, require authentication
     if (err || !user) {
+      // Check if info contains error details (passport puts errors here sometimes)
+      if (info instanceof Error) {
+        throw new UnauthorizedException(info.message);
+      }
+      if (info?.message) {
+        throw new UnauthorizedException(info.message);
+      }
       throw err || new UnauthorizedException('Authentication required');
     }
     return user;

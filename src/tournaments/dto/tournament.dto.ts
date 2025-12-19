@@ -14,7 +14,6 @@ export interface TournamentDto {
 export interface RegisteredPlayerDto {
   registrationId: number;
   email: string;
-  status: string;
   registeredAt: Date;
   userId?: string;
   name: string;

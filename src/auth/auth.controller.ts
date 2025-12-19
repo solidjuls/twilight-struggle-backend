@@ -1,5 +1,4 @@
-import { Controller, Post, Body, Res, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
-import { Response } from 'express';
+import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto, ImpersonateDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, EmailVerifyRequestDto, EmailVerifyConfirmDto } from './dto/auth.dto';
 import { Public, CurrentUser } from './decorators/auth.decorators';
@@ -12,34 +11,18 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() loginDto: LoginDto, @Res({ passthrough: true }) response: Response) {
+  async login(@Body() loginDto: LoginDto) {
     const { user, token } = await this.authService.login(loginDto);
 
-    // Set HTTP-only cookie
-    response.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
-      maxAge: 8640000, // 100 days in seconds
-      path: '/',
-    });
-
-    return user;
+    return { user, token };
   }
 
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(@Res({ passthrough: true }) response: Response) {
-    // Clear the token cookie
-    response.cookie('token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
-      expires: new Date(0),
-      path: '/',
-    });
-
+  async logout() {
+    // Token invalidation would be handled client-side by removing the token
+    // For server-side invalidation, you would need a token blacklist
     return { success: true };
   }
 
@@ -53,19 +36,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('impersonate')
   @HttpCode(HttpStatus.OK)
-  async impersonate(@Body() impersonateDto: ImpersonateDto, @CurrentUser() user: any, @Res({ passthrough: true }) response: Response) {
+  async impersonate(@Body() impersonateDto: ImpersonateDto, @CurrentUser() user: any) {
     const { user: impersonatedUser, token } = await this.authService.impersonate(impersonateDto.email, user);
 
-    // Set HTTP-only cookie
-    response.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV !== 'development',
-      sameSite: 'strict',
-      maxAge: 8640000, // 100 days in seconds
-      path: '/',
-    });
-
-    return impersonatedUser;
+    return { user: impersonatedUser, token };
   }
 
   @UseGuards(JwtAuthGuard)

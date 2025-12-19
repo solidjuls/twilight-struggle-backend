@@ -10,9 +10,7 @@ export const Roles = (...roles: number[]) => SetMetadata('roles', roles);
 // Decorator to get current user from request
 export const CurrentUser = createParamDecorator(
   (data: unknown, ctx: ExecutionContext): JwtPayloadDto => {
-    console.log("about to currentUser");
     const request = ctx.switchToHttp().getRequest();
-    console.log("currentUser", request?.user);
     return request.user;
   },
 );

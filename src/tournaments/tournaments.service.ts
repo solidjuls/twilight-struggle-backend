@@ -119,7 +119,6 @@ export class TournamentsService {
       select: {
         id: true,
         userId: true,
-        status: true,
         created_at: true,
         users: {
           select: {
@@ -127,6 +126,8 @@ export class TournamentsService {
             email: true,
             first_name: true,
             last_name: true,
+            phone_number: true,
+            playdek_name: true,
             countries: {
               select: {
                 tld_code: true,
@@ -137,16 +138,15 @@ export class TournamentsService {
       }
     });
 
-    // Check if user is admin (global admin or tournament admin)
     const isAdmin = await this.isUserAdminForTournament(userRole, userId, tournamentId);
 
-    // Map registration data with user data
     return registrations.map(registration => {
       const user = registration.users;
       return {
         registrationId: registration.id,
-        email: isAdmin ? (user?.email || '') : '', // Only include email for admins
-        status: registration.status || '',
+        email: isAdmin ? (user?.email || '') : '',
+        phoneNumber: isAdmin ? (user?.phone_number || '') : '',
+        playdekName: user?.playdek_name,
         registeredAt: registration.created_at || new Date(),
         userId: user?.id?.toString(),
         name: user ? `${user.first_name} ${user.last_name}` : 'Unknown User',
@@ -156,11 +156,6 @@ export class TournamentsService {
   }
 
   async isUserAdminForTournament(userRole?: number, userId?: string, tournamentId?: number): Promise<boolean> {
-    // Check if user is global admin (SUPERADMIN = 1 or ADMIN = 2)
-    if (userRole === 1 || userRole === 2) {
-      return true;
-    }
-
     // Check if user is tournament-specific admin
     if (userId && tournamentId) {
       try {
@@ -264,13 +259,9 @@ export class TournamentsService {
   }
 
   async getUserRegisteredTournaments(userId: string): Promise<TournamentDto[]> {
-    // Get tournaments where user is registered
     const registrations = await this.databaseService.tournament_registration.findMany({
       where: {
         userId: BigInt(userId),
-        status: {
-          in: ['accepted', 'pending'] // Only include active registrations
-        }
       },
       include: {
         tournaments: {
@@ -316,6 +307,11 @@ export class TournamentsService {
     const adminTournaments = await this.databaseService.tournament_admins.findMany({
       where: {
         userId: BigInt(userId),
+        tournaments: {
+          status_id: {
+            in: [1, 2, 3, 4]
+          }
+        }
       },
       include: {
         tournaments: {

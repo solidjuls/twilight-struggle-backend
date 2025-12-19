@@ -1,8 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { Strategy } from 'passport-jwt';
+import { Strategy, ExtractJwt } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
 import { JwtPayloadDto } from '../dto/auth.dto';
 import { DatabaseService } from '../../database/database.service';
 
@@ -13,14 +12,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private databaseService: DatabaseService
   ) {
     super({
-      jwtFromRequest: (req: Request) => {
-        // Extract JWT from HTTP-only cookie
-        let token = null;
-        if (req && req.cookies) {
-          token = req.cookies['token'];
-        }
-        return token;
-      },
+      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.get<string>('JWT_SECRET'),
     });

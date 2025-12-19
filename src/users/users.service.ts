@@ -134,15 +134,11 @@ export class UsersService {
     // Add search filter if provided
     if (search) {
       const trimmedSearch = search.trim();
-
-      // Check if search contains whitespace (indicating first_name + last_name search)
-      // if (trimmedSearch.includes(' ')) {
         const searchParts = trimmedSearch.split(/\s+/); // Split by any whitespace
         const firstName = searchParts[0];
         const lastName = searchParts.slice(1).join(' '); // Join remaining parts as last name
 
         where.OR = [
-          // Exact first_name + last_name match
           {
             AND: [
               {
@@ -157,66 +153,21 @@ export class UsersService {
               },
             ],
           },
-          // // Reverse order: last_name + first_name match
-          // {
-          //   AND: [
-          //     {
-          //       first_name: {
-          //         contains: lastName,
-          //         mode: 'insensitive',
-          //       },
-          //     },
-          //     {
-          //       last_name: {
-          //         contains: firstName,
-          //         mode: 'insensitive',
-          //       },
-          //     },
-          //   ],
-          // },
-          // // Fallback: search entire string in individual fields
-          // {
-          //   first_name: {
-          //     contains: trimmedSearch,
-          //     mode: 'insensitive',
-          //   },
-          // },
-          // {
-          //   last_name: {
-          //     contains: trimmedSearch,
-          //     mode: 'insensitive',
-          //   },
-          // },
-          // {
-          //   email: {
-          //     contains: trimmedSearch,
-          //     mode: 'insensitive',
-          //   },
-          // },
+          {
+            AND: [
+              {
+                first_name: {
+                  contains: lastName,
+                },
+              },
+              {
+                last_name: {
+                  contains: firstName,
+                },
+              },
+            ],
+          },
         ];
-      // } else {
-      //   // Single term search - search in first_name, last_name, and email
-      //   where.OR = [
-      //     {
-      //       first_name: {
-      //         contains: trimmedSearch,
-      //         mode: 'insensitive',
-      //       },
-      //     },
-      //     {
-      //       last_name: {
-      //         contains: trimmedSearch,
-      //         mode: 'insensitive',
-      //       },
-      //     },
-      //     {
-      //       email: {
-      //         contains: trimmedSearch,
-      //         mode: 'insensitive',
-      //       },
-      //     },
-      //   ];
-      // }
     }
 
     // Get total count
@@ -272,7 +223,7 @@ export class UsersService {
     };
   }
 
-  private async getUserRating(userId: bigint): Promise<number | undefined> {
+  public async getUserRating(userId: bigint): Promise<number | undefined> {
     try {
       // Get the latest rating for the user
       const rating = await this.databaseService.ratings_history.findFirst({
