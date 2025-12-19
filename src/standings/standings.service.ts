@@ -90,10 +90,64 @@ export class StandingsService {
       const usaId = game.usa_player_id.toString();
       const ussrId = game.ussr_player_id.toString();
 
-      if (!players[usaId] || !players[ussrId]) {
-        continue;
+      if (!players[usaId]) {
+        const forfeitUser = await prisma.users.findFirst({
+          select: {
+            first_name: true,
+            last_name: true,
+            countries: {
+              select: {
+                tld_code: true,
+              },
+            },
+          },
+          where: {
+            id: Number(usaId),
+          },
+        });
+        players[usaId] = {
+          userId: usaId,
+          standingName: "Forfeit",
+          secondaryName: "Forfeit",
+          gamesWon: 0,
+          gamesLost: 0,
+          gamesTied: 0,
+          winRate: 0,
+          sos: 0,
+          tldCode: forfeitUser?.countries?.tld_code,
+          name: `${forfeitUser?.first_name} ${forfeitUser?.last_name}`,
+          opponents: [],
+        };
       }
-      
+      if (!players[ussrId]) {
+        const forfeitUser = await prisma.users.findFirst({
+          select: {
+            first_name: true,
+            last_name: true,
+            countries: {
+              select: {
+                tld_code: true,
+              },
+            },
+          },
+          where: {
+            id: Number(usaId),
+          },
+        });
+        players[ussrId] = {
+          userId: ussrId,
+          standingName: "Forfeit",
+          secondaryName: "Forfeit",
+          gamesWon: 0,
+          gamesLost: 0,
+          gamesTied: 0,
+          winRate: 0,
+          sos: 0,
+          tldCode: forfeitUser?.countries?.tld_code,
+          name: `${forfeitUser?.first_name} ${forfeitUser?.last_name}`,
+          opponents: [],
+        };
+      }
       // Track opponents for SoS calculation
       players[usaId].opponents.push(ussrId);
       players[ussrId].opponents.push(usaId);
