@@ -120,42 +120,109 @@ export class AuthService {
     return payload;
   }
 
-  async resetPasswordRequest(mail: string): Promise<{ success: boolean }> {
+  async resetPasswordRequest(mail: string): Promise<{ success: boolean; message: string }> {
     const user = await this.databaseService.users.findFirst({
       select: { id: true, first_name: true, email: true },
       where: { email: mail },
     });
 
     if (!user) {
-      return { success: false };
+      // Don't reveal if user exists or not for security
+      return { success: true, message: 'If an account with this email exists, a password reset email has been sent.' };
     }
 
-    // Generate hash for password reset (implement your hash generation logic)
-    const hash = this.generateHash(mail);
+    // Generate token for password reset
+    const resetToken = this.generateHash(mail);
+    const resetUrl = `${process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
 
-    // Send email logic would go here
-    // const mailOutput = await sendEmail(mail, user.first_name, `${getUrl()}/reset-password/${hash}`);
+    // Get SMTP configuration from environment variables
+    const smtpConfig: SMTPConfig = {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER || '',
+      password: process.env.SMTP_HOST_RESET_PWD || '',
+    };
 
-    return { success: true };
+    try {
+      const emailSent = await this.emailService.sendPasswordResetEmail(
+        mail,
+        user.first_name || 'User',
+        resetUrl,
+        smtpConfig
+      );
+
+      if (emailSent) {
+        return {
+          success: true,
+          message: 'Password reset email sent! Please check your inbox.'
+        };
+      } else {
+        return {
+          success: false,
+          message: 'Failed to send password reset email. Please try again later.'
+        };
+      }
+    } catch (error) {
+      console.error('Password reset email error:', error);
+      return {
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.'
+      };
+    }
   }
 
-  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean }> {
+  async resetPassword(token: string, newPassword: string): Promise<{ success: boolean; message: string }> {
     try {
+      console.log(`token`, token);
       const decrypted = this.decryptHash(token);
       const values = decrypted.split('#');
-      const mail = values[0];
 
+      if (values.length !== 2) {
+        return { success: false, message: 'Invalid reset token format' };
+      }
+
+      const mail = values[0];
+      const timestamp = parseInt(values[1]);
+
+      // Check if token is expired (24 hours)
+      const tokenAge = Date.now() - timestamp;
+      const maxAge = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+      if (tokenAge > maxAge) {
+        return {
+          success: false,
+          message: 'Password reset link has expired. Please request a new one.'
+        };
+      }
+console.log(`mail`, mail, newPassword);
+      // Find user by email
+      const user = await this.databaseService.users.findFirst({
+        where: { email: mail },
+        select: { id: true, email: true }
+      });
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found. The reset link may be invalid.'
+        };
+      }
+
+      // Hash and update password
       const hashedPassword = await hash(newPassword, 12);
 
       await this.databaseService.users.update({
         where: { email: mail },
         data: { password: hashedPassword },
       });
+console.log(`hashedPassword`, hashedPassword);
+      console.log(`✅ Password reset successfully for user: ${mail}`);
 
-      return { success: true };
+      return { success: true, message: 'Your password has been successfully reset! You can now log in.' };
     } catch (error) {
       console.error('Reset password error:', error);
-      throw new BadRequestException('Invalid reset token');
+      return { success: false, message: 'Invalid or expired reset link. Please request a new one.' };
     }
   }
 
