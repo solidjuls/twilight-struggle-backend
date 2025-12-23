@@ -14,6 +14,22 @@ import {
 export class UsersService {
   constructor(private readonly databaseService: DatabaseService) {}
 
+  async getPlayerIdsByCountry(countryId: string): Promise<string[]> {
+    const users = await this.databaseService.users.findMany({
+      select: { id: true },
+      where: { country_id: BigInt(countryId) },
+    });
+    return users.map((user) => user.id.toString());
+  }
+
+  async getPlayerIdByPlaydekName(playdekName: string): Promise<string> {
+    const users = await this.databaseService.users.findFirst({
+      select: { id: true },
+      where: { playdek_name: playdekName },
+    });
+    return users.id.toString();
+  }
+
   async getUserById(id: string): Promise<UserDetailDto | null> {
     const user = await this.databaseService.users.findFirst({
       select: {
