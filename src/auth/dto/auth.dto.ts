@@ -34,6 +34,7 @@ export interface ResetPasswordDto {
   mail?: string;
   token?: string;
   pwd?: string;
+  newPassword?: string;
 }
 
 export interface CreateUserDto {

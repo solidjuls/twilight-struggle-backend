@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { UsersService } from '../users/users.service';
 import { GameWinner } from '../games/dto/game.dto';
 import { PlayerRatingDto, PlayerRatingListResponse } from './dto/rating.dto';
 import { getTopNRatedPlayersWithFilter, getTopNRatedPlayers } from "@prisma/client/sql";
@@ -9,7 +10,10 @@ const FRIENDLY_GAME = "47"
 
 @Injectable()
 export class RatingService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly usersService: UsersService,
+  ) {}
 
   async getRatingByPlayer(playerId: bigint, prismaTransaction?: any): Promise<{ rating: number } | null> {
     const client = prismaTransaction || this.databaseService;
@@ -157,14 +161,24 @@ export class RatingService {
     let skip = (page - 1) * pageSize;
     try {
       let results = []
+      let usersByCountry = []
+
       if (playerIds) {
         // @ts-ignore
         results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(playerIds?.join(','), pageSize, skip));
+      } else if (countryId) {
+        usersByCountry = await this.usersService.getPlayerIdsByCountry(countryId);
+        // @ts-ignore
+        results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(usersByCountry?.join(','), pageSize, skip));
+      } else if(playdeckName) {
+        const userId = await this.usersService.getPlayerIdByPlaydekName(playdeckName);
+        // @ts-ignore
+        results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(userId, pageSize, skip));
       } else {
         // @ts-ignore
         results = await this.databaseService.$queryRaw(getTopNRatedPlayers(pageSize, skip));
       }
-      // Transform results to match the expected DTO structure
+
       const transformedResults: PlayerRatingDto[] = results.map((row) => ({
         id: row.id.toString(),
         rank: Number(row.ranking),
@@ -175,7 +189,6 @@ export class RatingService {
         rating: Number(row.rating),
       }));
 
-      // Get total count from the first result
       const totalRows = results.length > 0 ? Number(results[0].total_players) : 0;
 
       return {

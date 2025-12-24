@@ -64,10 +64,11 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    const { token, pwd, mail } = resetPasswordDto;
+    const { token, pwd, mail, newPassword } = resetPasswordDto;
 
-    if (token && pwd) {
-      return this.authService.resetPassword(token, pwd);
+    const password = newPassword || pwd;
+    if (token && password) {
+      return this.authService.resetPassword(token, password);
     } else if (mail) {
       return this.authService.resetPasswordRequest(mail);
     }

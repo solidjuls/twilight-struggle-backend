@@ -28,6 +28,7 @@ export class EmailService {
    * @returns Promise<boolean> - Success status
    */
   async sendEmail(emailOptions: EmailOptions, smtpConfig: SMTPConfig): Promise<boolean> {
+    console.log("emailOptions", smtpConfig);
     try {
       // Create transporter with provided SMTP config
       const transporter: Transporter = nodemailer.createTransport({
@@ -172,6 +173,110 @@ Important: This verification link will expire in 24 hours for security reasons.
 If you didn't create an account with Twilight Struggle, you can safely ignore this email.
 
 Welcome to the Twilight Struggle community!
+
+---
+© ${new Date().getFullYear()} Twilight Struggle. All rights reserved.
+This is an automated email. Please do not reply to this message.
+    `.trim();
+  }
+
+  /**
+   * Send password reset email with pre-built template
+   * @param email - Recipient email
+   * @param name - Recipient name
+   * @param resetUrl - Password reset link
+   * @param smtpConfig - SMTP configuration
+   * @returns Promise<boolean> - Success status
+   */
+  async sendPasswordResetEmail(
+    email: string,
+    name: string,
+    resetUrl: string,
+    smtpConfig: SMTPConfig
+  ): Promise<boolean> {
+    const emailOptions: EmailOptions = {
+      to: [email],
+      subject: 'Reset Your Password - Twilight Struggle',
+      html: this.generatePasswordResetEmailHTML(name, resetUrl),
+      text: this.generatePasswordResetEmailText(name, resetUrl),
+    };
+
+    return this.sendEmail(emailOptions, smtpConfig);
+  }
+
+  /**
+   * Generate HTML template for password reset email
+   */
+  private generatePasswordResetEmailHTML(name: string, resetUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Password Reset</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #2c3e50; color: white; padding: 20px; text-align: center; }
+          .content { padding: 30px; background-color: #f9f9f9; }
+          .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #e74c3c;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+          }
+          .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Twilight Struggle</h1>
+            <h2>Password Reset</h2>
+          </div>
+          <div class="content">
+            <h3>Hello ${name || 'User'}!</h3>
+            <p>We received a request to reset the password for your Twilight Struggle account. Click the button below to set a new password:</p>
+
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="button">Reset Password</a>
+            </div>
+
+            <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #e74c3c;">${resetUrl}</p>
+
+            <p><strong>Important:</strong> This password reset link will expire in 24 hours for security reasons.</p>
+
+            <p>If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+          </div>
+          <div class="footer">
+            <p>© ${new Date().getFullYear()} Twilight Struggle. All rights reserved.</p>
+            <p>This is an automated email. Please do not reply to this message.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Generate plain text template for password reset email
+   */
+  private generatePasswordResetEmailText(name: string, resetUrl: string): string {
+    return `
+Hello ${name || 'User'}!
+
+We received a request to reset the password for your Twilight Struggle account. To set a new password, please visit the following link:
+
+${resetUrl}
+
+Important: This password reset link will expire in 24 hours for security reasons.
+
+If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
 
 ---
 © ${new Date().getFullYear()} Twilight Struggle. All rights reserved.
