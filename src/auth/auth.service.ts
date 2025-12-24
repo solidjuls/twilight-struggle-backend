@@ -1,9 +1,14 @@
 import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { compare, hash } from 'bcryptjs';
+import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { EmailService, SMTPConfig } from '../email/email.service';
 import { LoginDto, AuthResponseDto, JwtPayloadDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, RegisterUserResponse, EmailVerifyRequestDto, EmailVerifyConfirmDto, EmailVerifyResponse } from './dto/auth.dto';
+
+const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
 
 @Injectable()
 export class AuthService {
@@ -195,7 +200,7 @@ export class AuthService {
           message: 'Password reset link has expired. Please request a new one.'
         };
       }
-console.log(`mail`, mail, newPassword);
+
       // Find user by email
       const user = await this.databaseService.users.findFirst({
         where: { email: mail },
@@ -216,7 +221,7 @@ console.log(`mail`, mail, newPassword);
         where: { email: mail },
         data: { password: hashedPassword },
       });
-console.log(`hashedPassword`, hashedPassword);
+
       console.log(`✅ Password reset successfully for user: ${mail}`);
 
       return { success: true, message: 'Your password has been successfully reset! You can now log in.' };
@@ -226,19 +231,50 @@ console.log(`hashedPassword`, hashedPassword);
     }
   }
 
-  private generateHash(mail: string): string {
-    // Implement your hash generation logic here
-    // This should match your existing implementation
-    const timestamp = Date.now();
-    const data = `${mail}#${timestamp}`;
-    return Buffer.from(data).toString('base64');
+  private getEncryptionKey(): Buffer {
+    const secret = process.env.TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET
+    // Ensure the key is exactly 32 bytes for AES-256
+    return crypto.createHash('sha256').update(secret).digest();
   }
 
-  private decryptHash(hash: string): string {
-    // Implement your hash decryption logic here
-    // This should match your existing implementation
-    const buff = Buffer.from(hash, 'base64');
-    return buff.toString('ascii');
+  private generateHash(mail: string): string {
+    const timestamp = Date.now();
+    const data = `${mail}#${timestamp}`;
+
+    const key = this.getEncryptionKey();
+    const iv = crypto.randomBytes(IV_LENGTH);
+
+    const cipher = crypto.createCipheriv(ENCRYPTION_ALGORITHM, key, iv);
+    let encrypted = cipher.update(data, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    const authTag = cipher.getAuthTag();
+
+    // Combine IV + authTag + encrypted data and encode as base64url (URL-safe)
+    const combined = Buffer.concat([iv, authTag, Buffer.from(encrypted, 'hex')]);
+    return combined.toString('base64url');
+  }
+
+  private decryptHash(token: string): string {
+    try {
+      const key = this.getEncryptionKey();
+      const combined = Buffer.from(token, 'base64url');
+
+      // Extract IV, authTag, and encrypted data
+      const iv = combined.subarray(0, IV_LENGTH);
+      const authTag = combined.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+      const encrypted = combined.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+
+      const decipher = crypto.createDecipheriv(ENCRYPTION_ALGORITHM, key, iv);
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(encrypted.toString('hex'), 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      return decrypted;
+    } catch (error) {
+      throw new BadRequestException('Invalid token');
+    }
   }
 
   async createUser(createUserDto: CreateUserDto): Promise<{ success: boolean; user?: AuthResponseDto }> {
