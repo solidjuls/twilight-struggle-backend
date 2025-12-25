@@ -14,6 +14,7 @@ import { CitiesModule } from './cities/cities.module';
 import { RatingModule } from './rating/rating.module';
 import { StandingsModule } from './standings/standings.module';
 import { EmailModule } from './email/email.module';
+import { HallOfFameModule } from './hall-of-fame/hall-of-fame.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 @Module({
@@ -31,7 +32,8 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
     CitiesModule,
     RatingModule,
     StandingsModule,
-    EmailModule
+    EmailModule,
+    HallOfFameModule,
   ],
   controllers: [AppController],
   providers: [
