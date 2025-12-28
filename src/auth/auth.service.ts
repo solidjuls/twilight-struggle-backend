@@ -417,8 +417,8 @@ export class AuthService {
       host: process.env.SMTP_HOST || 'localhost',
       port: parseInt(process.env.SMTP_PORT || '587'),
       secure: process.env.SMTP_SECURE === 'true',
-      user: process.env.SMTP_VERIFY_USER || '',
-      password: process.env.SMTP_VERIFY_PWD || '',
+      user: process.env.SMTP_USER_JUNTA || '',
+      password: process.env.SMTP_PWD_JUNTA || '',
     };
 
     // Check if SMTP is configured

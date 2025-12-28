@@ -27,9 +27,8 @@ export class RatingController {
     try {
       const {
         p = '1',
-        pso = '20',
+        pso = '100',
         page: newPage,
-        pageSize: newPageSize,
         playerFilter,
         countrySelected,
         playdeck,
@@ -38,15 +37,11 @@ export class RatingController {
 
       // Parse parameters - support both legacy (p, pso) and new (page, pageSize) parameters
       const page = Number(newPage || p);
-      const pageSize = Number(newPageSize || pso);
+      const pageSize = Number(pso);
       const playerIds = playerFilter ? playerFilter.split(',').filter(id => id.trim()) : undefined;
 
-      // Validate parameters
       if (page < 1) {
         throw new HttpException('Page must be greater than 0', HttpStatus.BAD_REQUEST);
-      }
-      if (pageSize < 1 || pageSize > 100) {
-        throw new HttpException('Page size must be between 1 and 100', HttpStatus.BAD_REQUEST);
       }
 
       const result = await this.ratingService.getPlayerRatings({

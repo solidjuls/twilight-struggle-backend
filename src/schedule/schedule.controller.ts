@@ -169,7 +169,6 @@ export class ScheduleController {
     try {
       const schedules = body.data;
 
-      // Update due date
       if (schedules.due_date) {
         const scheduleResponse = await this.scheduleService.updateSchedule({
           dueDate: new Date(schedules.due_date),
@@ -180,44 +179,7 @@ export class ScheduleController {
           message: `Due date for schedule ${schedules.id} updated successfully`,
           data: scheduleResponse,
         };
-      } else {
-        // Validate schedule integrity before submission
-        const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
-          usaPlayerId: Number(schedules.usa_player_id),
-          id: Number(schedules.id),
-          ussrPlayerId: Number(schedules.ussr_player_id),
-          gameCode: schedules.game_code,
-          tournamentId: Number(schedules.tournaments_id),
-        });
-
-        if (validateSchedule?.game_results_id) {
-          throw new HttpException(
-            `Schedule ${schedules.id} already submitted`,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        if (!validateSchedule?.id) {
-          throw new HttpException(
-            'Schedule not found',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        // Note: The original code calls a submit function from game.controller
-        // This would need to be implemented or imported from the game module
-        // For now, we'll just update the schedule with a placeholder game result ID
-        
-        const scheduleResponse = await this.scheduleService.updateSchedule({
-          gameResultId: 1, // This should be the actual game result ID from submit
-          scheduleId: Number(schedules.id),
-        });
-
-        return {
-          message: 'Schedule updated successfully',
-          data: scheduleResponse,
-        };
-      }
+      } 
     } catch (error) {
       console.error('[Schedule POST]', error);
       if (error instanceof HttpException) {
