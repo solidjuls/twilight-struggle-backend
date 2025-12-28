@@ -142,6 +142,33 @@ export class GamesController {
   @Post('submit')
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
+      console.log("submitGameRequest", submitGameRequest);
+      const data = submitGameRequest.data;
+
+      if (submitGameRequest.data.scheduleId) {
+        // Validate schedule integrity before submission
+        const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
+          usaPlayerId: Number(data.usaPlayerId),
+          id: Number(data.scheduleId),
+          ussrPlayerId: Number(data.ussrPlayerId),
+          gameCode: data.gameCode,
+          tournamentId: Number(data.tournamentId),
+        });
+
+        if (validateSchedule?.game_results_id) {
+          throw new HttpException(
+            `Schedule ${data.scheduleId} already submitted`,
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (!validateSchedule?.id) {
+          throw new HttpException(
+            'Schedule not found',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
       const result = await this.gamesService.submitGame(submitGameRequest.data);
 
       if (result && submitGameRequest.data.scheduleId) {
