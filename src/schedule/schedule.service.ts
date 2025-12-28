@@ -96,7 +96,9 @@ export class ScheduleService {
         due_date: 'asc',
       });
     }
-
+    prismaOrderBy.push({
+      id: 'asc',
+    });
     const totalRows = await this.databaseService.schedule.count({
       where: where.AND.length > 0 ? where : undefined,
     });

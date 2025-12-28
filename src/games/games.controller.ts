@@ -142,7 +142,6 @@ export class GamesController {
   @Post('submit')
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
-      console.log("submitGameRequest", submitGameRequest);
       const data = submitGameRequest.data;
 
       if (submitGameRequest.data.scheduleId) {
