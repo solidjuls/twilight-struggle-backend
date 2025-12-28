@@ -27,7 +27,7 @@ export class UsersService {
       select: { id: true },
       where: { playdek_name: playdekName },
     });
-    return users.id.toString();
+    return users?.id?.toString();
   }
 
   async getUserById(id: string): Promise<UserDetailDto | null> {
