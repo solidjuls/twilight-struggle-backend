@@ -6,7 +6,7 @@ import { HallOfFameEntryDto, PlayerDto } from './dto/hall-of-fame.dto';
 const overrides: Record<string, Partial<{ second: string; third: string }>> = {
   'RTSL-2018': { second: 'Ackbleh' },
   'RTSL-2019-A': { third: 'Siddhartha' },
-  'RATS 2021-A': { second: 'Wrathyy' },
+  'RATS-2021-A': { second: 'Wrathyy' },
 };
 
 @Injectable()
