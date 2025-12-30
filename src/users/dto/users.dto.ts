@@ -54,7 +54,7 @@ export interface UsersListResponse {
 export interface CreateUserDto {
   first_name: string;
   last_name: string;
-  name: string;
+  playdek_name: string;
   email: string;
   phone_number?: string;
   preferredGamingPlatform?: string;
@@ -66,7 +66,7 @@ export interface CreateUserDto {
 export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;
-  name?: string;
+  playdek_name?: string;
   email: string;
   phone?: string;
   preferredGamingPlatform?: string;

@@ -263,7 +263,6 @@ export class UsersService {
 
   async createUser(userData: CreateUserDto): Promise<{ success: boolean; error?: string }> {
     try {
-      // Check if user already exists
       const existingUser = await this.databaseService.users.findUnique({
         where: { email: userData.email },
       });
@@ -277,7 +276,7 @@ export class UsersService {
         data: {
           first_name: userData.first_name,
           last_name: userData.last_name,
-          playdek_name: userData.name,
+          playdek_name: userData.playdek_name,
           email: userData.email,
           phone_number: userData.phone_number,
           preferred_gaming_platform: userData.preferredGamingPlatform,
@@ -303,7 +302,7 @@ export class UsersService {
         data: {
           first_name: userData.firstName,
           last_name: userData.lastName,
-          playdek_name: userData.name,
+          playdek_name: userData.playdek_name,
           phone_number: userData.phone,
           last_login_at: new Date(),
           preferred_gaming_platform: userData.preferredGamingPlatform,
