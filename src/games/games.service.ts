@@ -372,6 +372,7 @@ export class GamesService {
                 end_mode: input.endMode,
                 video1: input.video1 || null,
                 reporter_id: BigInt(input.usaPlayerId),
+                tournament_id: Number(input.tournamentId),
               },
               where: {
                 id: Number(input.oldId),
