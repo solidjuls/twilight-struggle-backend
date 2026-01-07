@@ -54,6 +54,7 @@ export class UsersService {
           select: {
             id: true,
             country_name: true,
+            tld_code: true,
           },
         },
       },
@@ -85,6 +86,7 @@ export class UsersService {
       countries: user.countries ? {
         id: user.countries.id.toString(),
         country_name: user.countries.country_name,
+        tld_code: user.countries.tld_code,
       } : undefined,
       rating: rating,
     };

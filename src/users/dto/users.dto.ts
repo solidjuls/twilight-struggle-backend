@@ -27,21 +27,22 @@ export interface UserDetailDto {
   countries?: {
     id: string;
     country_name: string;
+    tld_code: string;
   };
   rating?: number;
 }
 
 export interface GetUsersQueryDto {
-  tournamentId?: string; // Tournament ID to filter users by tournament
-  page?: string; // Page number for pagination
-  pageSize?: string; // Number of items per page
-  search?: string; // Search term for user names
-  includeEmail?: string; // Include email in response (admin only)
+  tournamentId?: string;
+  page?: string;
+  pageSize?: string;
+  search?: string;
+  includeEmail?: string;
 
   // Legacy parameters for backward compatibility
-  t?: string; // tournament ID (legacy)
-  p?: string; // page (legacy)
-  pso?: string; // pageSize (legacy)
+  t?: string;
+  p?: string;
+  pso?: string;
 }
 
 export interface UsersListResponse {
