@@ -460,6 +460,46 @@ export class TournamentsController {
     }
   }
 
+  // PATCH /api/tournaments/:id/waitlist/toggle - Enable/disable waitlist for tournament
+  @Patch(':id/waitlist/toggle')
+  async toggleWaitlist(
+    @Param('id') id: string,
+    @Body() body: { enabled: boolean },
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    try {
+      const tournamentId = Number(id);
+
+      if (body.enabled === undefined) {
+        throw new HttpException('enabled field is required', HttpStatus.BAD_REQUEST);
+      }
+
+      // Check if user is admin for this tournament
+      const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        tournamentId
+      );
+
+      if (!isAdmin) {
+        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
+      }
+
+      const result = await this.tournamentsService.toggleWaitlist(tournamentId, body.enabled);
+      return {
+        success: true,
+        message: `Waitlist ${body.enabled ? 'enabled' : 'disabled'} for tournament`,
+        tournament: result,
+      };
+    } catch (error) {
+      console.error("TOURNAMENT WAITLIST TOGGLE API Error:", error);
+      throw new HttpException(
+        error.message || 'Internal Server Error',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   // GET /api/tournaments/user/registered - Get user's registered tournaments
   @Get('user/registered')
   async getUserRegisteredTournaments(@CurrentUser() user: JwtPayloadDto) {
