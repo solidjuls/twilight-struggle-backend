@@ -660,7 +660,7 @@ console.log("scheduleParsed", scheduleParsed);
     });
   }
 
-  async toggleWaitlist(tournamentId: number, enabled: boolean): Promise<any> {
+  async toggleWaitlist(tournamentId: number): Promise<any> {
     const tournament = await this.databaseService.tournaments.findUnique({
       where: { id: tournamentId },
     });
@@ -671,7 +671,7 @@ console.log("scheduleParsed", scheduleParsed);
 
     return await this.databaseService.tournaments.update({
       where: { id: tournamentId },
-      data: { waitlist: enabled },
+      data: { waitlist: !tournament.waitlist },
       select: {
         id: true,
         tournament_name: true,
