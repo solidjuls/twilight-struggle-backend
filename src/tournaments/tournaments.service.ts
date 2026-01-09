@@ -660,6 +660,26 @@ console.log("scheduleParsed", scheduleParsed);
     });
   }
 
+  async toggleWaitlist(tournamentId: number): Promise<any> {
+    const tournament = await this.databaseService.tournaments.findUnique({
+      where: { id: tournamentId },
+    });
+
+    if (!tournament) {
+      throw new Error('Tournament not found');
+    }
+
+    return await this.databaseService.tournaments.update({
+      where: { id: tournamentId },
+      data: { waitlist: !tournament.waitlist },
+      select: {
+        id: true,
+        tournament_name: true,
+        waitlist: true,
+      },
+    });
+  }
+
   async updateTournamentStatus(tournamentId: number, status: number, user: any): Promise<any> {
     // First, verify the tournament exists and user has permission to update it
     const tournament = await this.databaseService.tournaments.findUnique({

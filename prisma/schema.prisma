@@ -43,8 +43,8 @@ model game_results {
   reporter_id                              BigInt?           @db.UnsignedBigInt
   usa_previous_rating                      Int               @default(0)
   ussr_previous_rating                     Int               @default(0)
-  tournaments                              tournaments?      @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_game_results_tournament_id_foreign")
   users_game_results_reporter_idTousers    users?            @relation("game_results_reporter_idTousers", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_reporter_id_foreign")
+  tournaments                              tournaments?      @relation(fields: [tournament_id], references: [id], onDelete: Cascade, map: "fk_game_results_tournament_id_foreign")
   users_game_results_usa_player_idTousers  users             @relation("game_results_usa_player_idTousers", fields: [usa_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_usa_player_id_foreign")
   users_game_results_ussr_player_idTousers users             @relation("game_results_ussr_player_idTousers", fields: [ussr_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_ussr_player_id_foreign")
   ratings_history                          ratings_history[]
@@ -119,7 +119,6 @@ model users {
   first_name                                      String?                   @db.VarChar(255)
   last_name                                       String?                   @db.VarChar(255)
   last_login_at                                   DateTime?                 @db.Timestamp(0)
-  regional_federation_id                          String?                   @db.VarChar(8)
   city_id                                         BigInt?                   @db.UnsignedBigInt
   phone_number                                    String?                   @db.VarChar(20)
   preferred_gaming_platform                       String?                   @db.VarChar(50)
@@ -185,7 +184,6 @@ model tournament_waitlist {
   @@unique([tournamentId, userId], map: "unique_tournament_user_waitlist")
   @@index([tournamentId], map: "fk_tournament_waitlist")
   @@index([userId], map: "fk_tournament_waitlist_user")
-  @@index([tournamentId, position], map: "tournament_waitlist_position_index")
 }
 
 model tournaments {
@@ -194,9 +192,9 @@ model tournaments {
   status_id               Int
   created_at              DateTime?                 @default(now()) @db.Timestamp(0)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
-  description             String?                   @db.VarChar(255)
+  description             String?                   @db.Text
   starting_date           DateTime?                 @db.Date
-  waitlist                Boolean                   @default(false)
+  waitlist                Boolean?
   game_results            game_results[]
   schedule                schedule[]
   tournament_admins       tournament_admins[]
@@ -242,10 +240,10 @@ model standing_players {
   standing_id Int
   user_id     BigInt    @db.UnsignedBigInt
   standings   standings @relation(fields: [standing_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_standing_players_standing")
-  users       users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_standing_players_user_id_foreign")
+  users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_standing_players_user_id_foreign")
 
   @@id([standing_id, user_id])
-  @@index([user_id], map: "fk_standing_players_user_id_foreign")
+  @@index([user_id], map: "standing_players_user_id_foreign")
 }
 
 model standings {
@@ -265,9 +263,9 @@ model hall_of_fame {
   winner_id                           BigInt    @db.UnsignedBigInt
   second_id                           BigInt?   @db.UnsignedBigInt
   third_id                            BigInt?   @db.UnsignedBigInt
-  flag1                               String?   @db.Char(2)
-  flag2                               String?   @db.Char(2)
-  flag3                               String?   @db.Char(2)
+  flag1                               String?   @db.Char(3)
+  flag2                               String?   @db.Char(3)
+  flag3                               String?   @db.Char(3)
   created_at                          DateTime? @default(now()) @db.DateTime(0)
   updated_at                          DateTime? @default(now()) @db.DateTime(0)
   users_hall_of_fame_winner_idTousers users     @relation("hall_of_fame_winner_idTousers", fields: [winner_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "hall_of_fame_ibfk_1")
@@ -289,7 +287,6 @@ enum tournament_registration_status {
 
 enum tournament_waitlist_status {
   waiting
-  active
-  invited
-  removed
+  accepted
+  canceled
 }
