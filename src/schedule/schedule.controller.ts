@@ -260,16 +260,21 @@ export class ScheduleController {
   @Delete(':id')
   async deleteSchedule(@Param('id') id: string) {
     try {
-      // This endpoint wasn't in the original API but is mentioned in the requirements
-      // Implementation would depend on specific business logic
-      throw new HttpException(
-        'Delete schedule endpoint not implemented',
-        HttpStatus.NOT_IMPLEMENTED,
-      );
+      const result = await this.scheduleService.deleteSchedule(Number(id));
+      return {
+        success: result.success,
+        message: `Schedule ${id} deleted successfully`,
+      };
     } catch (error) {
       console.error('[Schedule DELETE]', error);
       if (error instanceof HttpException) {
         throw error;
+      }
+      if (error.message?.includes('not found')) {
+        throw new HttpException(error.message, HttpStatus.NOT_FOUND);
+      }
+      if (error.message?.includes('Cannot delete')) {
+        throw new HttpException(error.message, HttpStatus.BAD_REQUEST);
       }
       throw new HttpException(
         'Internal Server Error',

@@ -96,7 +96,6 @@ export class TournamentsController {
         // Register user for tournament - use provided userId or current user's id
         const targetUserId = userId || user.id.toString();
 
-        console.log("registered", userId, targetUserId);
         const registered = await this.tournamentsService.registerForTournament(Number(id), targetUserId);
         return {
           ...registered,

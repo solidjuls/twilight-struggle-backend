@@ -346,4 +346,21 @@ export class ScheduleService {
 
     return { created: result.count, errors: [] };
   }
+
+  async deleteSchedule(scheduleId: number): Promise<{ success: boolean }> {
+    const schedule = await this.databaseService.schedule.findUnique({
+      where: { id: scheduleId },
+    });
+
+    if (!schedule) {
+      throw new Error(`Schedule with ID ${scheduleId} not found`);
+    }
+
+    // Delete the schedule
+    await this.databaseService.schedule.delete({
+      where: { id: scheduleId },
+    });
+
+    return { success: true };
+  }
 }
