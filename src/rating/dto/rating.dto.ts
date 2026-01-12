@@ -10,6 +10,11 @@ export interface PlayerRatingDto {
   playdek_name?: string;
 }
 
+export interface PlayerRatingHistoryDto {
+  userId: string;
+  fromDate: number;
+}
+
 export interface PlayerRatingListResponse {
   results: PlayerRatingDto[];
   totalRows: number;

@@ -12,6 +12,7 @@ import { Public } from '../auth/decorators/public.decorator';
 import {
   GetPlayerRatingsQueryDto,
   PlayerRatingListResponse,
+  PlayerRatingHistoryDto,
 } from './dto/rating.dto';
 
 @Controller('rating')
@@ -54,6 +55,51 @@ export class RatingController {
       });
 
       return result;
+    } catch (error) {
+      console.error('[Rating GET]', error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get("history")
+  @Public()
+  async getRatingHistory(
+    @Query() query: PlayerRatingHistoryDto,
+  ): Promise<any> {
+    try {
+        const {
+          userId,
+          fromDate,
+        } = query;
+
+        if (!userId) {
+          throw new HttpException('userId is required', HttpStatus.BAD_REQUEST);
+        }
+        if (!fromDate) {
+          throw new HttpException('fromDate is required', HttpStatus.BAD_REQUEST);
+        }
+
+        const result = await this.ratingService.getRatingHistory({
+          userId,
+          fromDate,
+        });
+        
+        const serializedData = JSON.stringify(result, (_, value) => {
+        if (typeof value === "bigint") {
+          return value.toString();
+        }
+        return value;
+      });
+console.log('serializedData', serializedData);
+      return serializedData;
+
+
     } catch (error) {
       console.error('[Rating GET]', error);
       if (error instanceof HttpException) {
