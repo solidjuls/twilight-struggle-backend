@@ -203,7 +203,7 @@ export class RatingService {
     }
   }
 
-  async getRatingHistory({ userId, fromDate }: { userId: string; fromDate: number }): Promise<any> {
+  async getRatingHistory({ userId, fromDate }: { userId: string; fromDate: Date | undefined }): Promise<any> {
     try {
       const ratingHistory = await this.databaseService.$queryRaw<any[]>`
         WITH latest_ratings AS (
@@ -246,7 +246,8 @@ export class RatingService {
           AND rh_ussr.rn = 1
         LEFT JOIN users u_usa ON u_usa.id = gr.usa_player_id
         LEFT JOIN users u_ussr ON u_ussr.id = gr.ussr_player_id
-        WHERE (gr.usa_player_id = ${userId} OR gr.ussr_player_id = ${userId}) AND gr.game_date >= ${fromDate}
+        WHERE (gr.usa_player_id = ${userId} OR gr.ussr_player_id = ${userId}) 
+        AND (${fromDate ?? null} IS NULL OR game_date >= ${fromDate})
         ORDER BY gr.game_date DESC
       `;
 

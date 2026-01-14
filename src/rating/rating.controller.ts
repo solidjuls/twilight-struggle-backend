@@ -73,33 +73,29 @@ export class RatingController {
     @Query() query: PlayerRatingHistoryDto,
   ): Promise<any> {
     try {
-        const {
-          userId,
-          fromDate,
-        } = query;
+      const {
+        userId,
+        fromDate,
+      } = query;
 
-        if (!userId) {
-          throw new HttpException('userId is required', HttpStatus.BAD_REQUEST);
-        }
-        if (!fromDate) {
-          throw new HttpException('fromDate is required', HttpStatus.BAD_REQUEST);
-        }
+      if (!userId) {
+        throw new HttpException('userId is required', HttpStatus.BAD_REQUEST);
+      }
 
-        const result = await this.ratingService.getRatingHistory({
-          userId,
-          fromDate,
-        });
-        
-        const serializedData = JSON.stringify(result, (_, value) => {
+      const date = fromDate ? new Date(fromDate) : undefined;
+      const result = await this.ratingService.getRatingHistory({
+        userId,
+        fromDate: date,
+      });
+      
+      const serializedData = JSON.stringify(result, (_, value) => {
         if (typeof value === "bigint") {
           return value.toString();
         }
         return value;
       });
-console.log('serializedData', serializedData);
+
       return serializedData;
-
-
     } catch (error) {
       console.error('[Rating GET]', error);
       if (error instanceof HttpException) {

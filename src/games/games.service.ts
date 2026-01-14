@@ -9,6 +9,7 @@ import {
   SubmitGameDto,
   RecreateGameDto,
 } from './dto/game.dto';
+import { PrismaClient } from '@prisma/client';
 
 const FRIENDLY_GAME = 47
 
@@ -737,4 +738,77 @@ export class GamesService {
 
     return { usaRating, ussrRating };
   }
+
+  public async getWinTypeChartData(userId: string, fromDate?: Date): Promise<any> {
+    try {
+      const usaStats = await this.databaseService.$queryRaw<any[]>`
+      SELECT 
+        COUNT(*) as total_games,
+        SUM(CASE WHEN game_winner = '1' THEN 1 ELSE 0 END) as wins,
+        SUM(CASE WHEN game_winner = '2' THEN 1 ELSE 0 END) as losses,
+        SUM(CASE WHEN game_winner = '3' THEN 1 ELSE 0 END) as ties,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'DEFCON' THEN 1 ELSE 0 END) as defcon_wins,
+        SUM(CASE WHEN game_winner = '1' AND (end_mode = 'Final Scoring' OR end_mode = 'Europe Control') THEN 1 ELSE 0 END) as final_scoring_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'VP Track (+20)' THEN 1 ELSE 0 END) as vp_track_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Wargames' THEN 1 ELSE 0 END) as wargames_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Forfeit' THEN 1 ELSE 0 END) as forfeit_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Timer Expired' THEN 1 ELSE 0 END) as timer_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Cuban Missile Crisis' THEN 1 ELSE 0 END) as cuban_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Scoring Card Held' THEN 1 ELSE 0 END) as scoring_card_wins,
+        SUM(CASE WHEN game_winner = '1' AND (end_mode IS NULL OR end_mode NOT IN ('DEFCON', 'Final Scoring', 'Europe Control', 'VP Track (+20)', 'Wargames', 'Forfeit', 'Timer Expired', 'Cuban Missile Crisis', 'Scoring Card Held')) THEN 1 ELSE 0 END) as unknown_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'DEFCON' THEN 1 ELSE 0 END) as defcon_losses,
+        SUM(CASE WHEN game_winner = '2' AND (end_mode = 'Final Scoring' OR end_mode = 'Europe Control') THEN 1 ELSE 0 END) as final_scoring_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'VP Track (+20)' THEN 1 ELSE 0 END) as vp_track_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Wargames' THEN 1 ELSE 0 END) as wargames_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Forfeit' THEN 1 ELSE 0 END) as forfeit_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Timer Expired' THEN 1 ELSE 0 END) as timer_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Cuban Missile Crisis' THEN 1 ELSE 0 END) as cuban_losses,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Scoring Card Held' THEN 1 ELSE 0 END) as scoring_card_losses,
+        SUM(CASE WHEN game_winner = '2' AND (end_mode IS NULL OR end_mode NOT IN ('DEFCON', 'Final Scoring', 'Europe Control', 'VP Track (+20)', 'Wargames', 'Forfeit', 'Timer Expired', 'Cuban Missile Crisis', 'Scoring Card Held')) THEN 1 ELSE 0 END) as unknown_losses
+      FROM game_results
+      WHERE usa_player_id = ${userId} 
+      AND (${fromDate ?? null} IS NULL OR game_date >= ${fromDate})
+    `;
+
+    // SQL query to get win/loss statistics for USSR
+    const ussrStats = await this.databaseService.$queryRaw<any[]>`
+      SELECT 
+        COUNT(*) as total_games,
+        SUM(CASE WHEN game_winner = '2' THEN 1 ELSE 0 END) as wins,
+        SUM(CASE WHEN game_winner = '1' THEN 1 ELSE 0 END) as losses,
+        SUM(CASE WHEN game_winner = '3' THEN 1 ELSE 0 END) as ties,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'DEFCON' THEN 1 ELSE 0 END) as defcon_wins,
+        SUM(CASE WHEN game_winner = '2' AND (end_mode = 'Final Scoring' OR end_mode = 'Europe Control') THEN 1 ELSE 0 END) as final_scoring_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'VP Track (+20)' THEN 1 ELSE 0 END) as vp_track_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Wargames' THEN 1 ELSE 0 END) as wargames_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Forfeit' THEN 1 ELSE 0 END) as forfeit_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Timer Expired' THEN 1 ELSE 0 END) as timer_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Cuban Missile Crisis' THEN 1 ELSE 0 END) as cuban_wins,
+        SUM(CASE WHEN game_winner = '2' AND end_mode = 'Scoring Card Held' THEN 1 ELSE 0 END) as scoring_card_wins,
+        SUM(CASE WHEN game_winner = '2' AND (end_mode IS NULL OR end_mode NOT IN ('DEFCON', 'Final Scoring', 'Europe Control', 'VP Track (+20)', 'Wargames', 'Forfeit', 'Timer Expired', 'Cuban Missile Crisis', 'Scoring Card Held')) THEN 1 ELSE 0 END) as unknown_wins,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'DEFCON' THEN 1 ELSE 0 END) as defcon_losses,
+        SUM(CASE WHEN game_winner = '1' AND (end_mode = 'Final Scoring' OR end_mode = 'Europe Control') THEN 1 ELSE 0 END) as final_scoring_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'VP Track (+20)' THEN 1 ELSE 0 END) as vp_track_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Wargames' THEN 1 ELSE 0 END) as wargames_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Forfeit' THEN 1 ELSE 0 END) as forfeit_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Timer Expired' THEN 1 ELSE 0 END) as timer_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Cuban Missile Crisis' THEN 1 ELSE 0 END) as cuban_losses,
+        SUM(CASE WHEN game_winner = '1' AND end_mode = 'Scoring Card Held' THEN 1 ELSE 0 END) as scoring_card_losses,
+        SUM(CASE WHEN game_winner = '1' AND (end_mode IS NULL OR end_mode NOT IN ('DEFCON', 'Final Scoring', 'Europe Control', 'VP Track (+20)', 'Wargames', 'Forfeit', 'Timer Expired', 'Cuban Missile Crisis', 'Scoring Card Held')) THEN 1 ELSE 0 END) as unknown_losses
+      FROM game_results
+      WHERE ussr_player_id = ${userId} 
+      AND (${fromDate ?? null} IS NULL OR game_date >= ${fromDate})
+    `;
+      const result = {
+        usaStats,
+        ussrStats,
+      };
+      return result;
+    } catch (error) {
+      console.error('Error executing SQL query:', error);
+      throw new Error('Failed to fetch chart data');
+    }
+  }
+  
 }
+
