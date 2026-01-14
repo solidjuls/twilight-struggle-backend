@@ -19,6 +19,7 @@ import {
   GameFilterDto,
   SubmitGameRequestDto,
   RecreateGameDto,
+  GetGameChartQueryDto,
 } from './dto/game.dto';
 import { ScheduleService } from 'src/schedule/schedule.service';
 
@@ -114,6 +115,38 @@ export class GamesController {
     }
   }
 
+    @Get('chart-data')
+  @Public()
+  async getChartData(@Query() query: GetGameChartQueryDto) {
+    try {
+      const { type, userId, fromDate } = query;
+      if (type === 'winType') {
+        if (!userId) {
+          throw new HttpException(
+            'Invalid query parameters',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+        const date = fromDate ? new Date(fromDate) : undefined;
+        const result = await this.gamesService.getWinTypeChartData(userId, date);
+        const serializedData = JSON.stringify(result, (_, value) => {
+          if (typeof value === "bigint") {
+            return value.toString();
+          }
+          return value;
+        });
+        return serializedData;
+      }
+    }
+    catch (error) {
+      console.error('[Games GET Chart Data]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Get(':id')
   @Public()
   async getGameById(@Param('id') id: string) {
@@ -138,6 +171,8 @@ export class GamesController {
       );
     }
   }
+
+
 
   @Post('submit')
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
