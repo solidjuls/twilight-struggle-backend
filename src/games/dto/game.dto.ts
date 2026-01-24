@@ -3,6 +3,12 @@ export interface GameRatingDto {
   previousRating: number;
 }
 
+export interface GetGameChartQueryDto {
+  type: 'winType';
+  userId: string;
+  fromDate: string;
+}
+
 export interface GameDto {
   id: string;
   created_at: Date | null;
