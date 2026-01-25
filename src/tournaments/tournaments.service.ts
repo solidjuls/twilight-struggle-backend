@@ -1172,24 +1172,36 @@ console.log("scheduleParsed", scheduleParsed);
     };
   }
 
+  findFullNameById(id: bigint, registeredPlayers: any[]) {
+    const player = registeredPlayers.find(p => p.users.id === id);
+    return player ? `${player.users.first_name} ${player.users.last_name}` : 'Unknown Player';
+  }
   async createMissingSchedulePairs(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
     // 1. Get all registered players for the tournament
+    // het first nameand last name from users table
     const registeredPlayers = await this.databaseService.tournament_registration.findMany({
+      select: {
+        status: true,
+        users: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+          }
+        },
+      },
       where: { tournamentId },
-      select: { userId: true }
     });
 
     if (registeredPlayers.length < 2) {
       throw new Error('Not enough registered players');
     }
 
-    const playerIds = registeredPlayers
-      .filter(p => p.userId !== null)
-      .map(p => p.userId as bigint);
-
     // 2. Get current schedule counts for each player
     const schedules = await this.databaseService.schedule.findMany({
-      where: { tournaments_id: tournamentId },
+      where: {
+        tournaments_id: tournamentId,
+      },
       select: {
         id: true,
         usa_player_id: true,
@@ -1198,38 +1210,42 @@ console.log("scheduleParsed", scheduleParsed);
       }
     });
 
-    // Count games per player and find schedules with missing opponents
-    const playerGameCount = new Map<string, number>();
+    //|| [2835,1789,2241,3141,2589,2743,2344,2084,1862,2489,2985,2859,2089].includes(Number(p.users.id)) 
+    // find the registered players with status forfeited
+    const forfeitedPlayers = registeredPlayers.filter(p => p.status === 'forfeited');
+    const activePlayers = registeredPlayers.filter(p => p.status !== 'forfeited');
+console.log("forfeitedPlayers", forfeitedPlayers);
+    // find players ids who have not a single schedule comparing schedules with registeredplayers
+    const playersWithoutSchedule = registeredPlayers.filter(p => {
+      return !schedules.find(sch => sch.usa_player_id === p.users.id || sch.ussr_player_id === p.users.id);
+    });
+
+    // set to null the ids from schedules locally where the player is in the forfeitedPlayers array
     const schedulesWithMissingOpponent: Array<{
       id: number;
       existingPlayerId: bigint;
       isUSA: boolean;
     }> = [];
+    const playerGameCount = new Map<string, number>();
 
-    for (const playerId of playerIds) {
-      playerGameCount.set(playerId.toString(), 0);
+    for (const player of registeredPlayers) {
+      playerGameCount.set(player.users.id.toString(), 0);
     }
 
-    for (const schedule of schedules) {
-      const usaId = schedule.usa_player_id?.toString();
-      const ussrId = schedule.ussr_player_id?.toString();
+    for (const player of forfeitedPlayers) { 
+      for (let schedule of schedules) {
+        if (schedule.game_results_id !== null) continue;
 
-      if (usaId && playerGameCount.has(usaId)) {
-        playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
-      }
-      if (ussrId && playerGameCount.has(ussrId)) {
-        playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
-      }
-
-      // Track schedules with missing opponent (no game result yet)
-      if (!schedule.game_results_id) {
-        if (schedule.usa_player_id && !schedule.ussr_player_id) {
+        if (schedule.usa_player_id === player.users.id) {
+          schedule.usa_player_id = null;
           schedulesWithMissingOpponent.push({
             id: schedule.id,
             existingPlayerId: schedule.usa_player_id,
             isUSA: true
           });
-        } else if (!schedule.usa_player_id && schedule.ussr_player_id) {
+        }
+        if (schedule.ussr_player_id === player.users.id) {
+          schedule.ussr_player_id = null;
           schedulesWithMissingOpponent.push({
             id: schedule.id,
             existingPlayerId: schedule.ussr_player_id,
@@ -1239,26 +1255,40 @@ console.log("scheduleParsed", scheduleParsed);
       }
     }
 
+
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+
+      if (ussrId && usaId && playerGameCount.has(usaId)) {
+        playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+      }
+      if (ussrId && usaId && playerGameCount.has(ussrId)) {
+        playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+      }
+    }
+
     // 3. Get ratings for all players
     const playerRatings = new Map<string, number>();
-    for (const playerId of playerIds) {
+    for (const player of activePlayers) {
       const ratingRecord = await this.databaseService.ratings_history.findFirst({
-        where: { player_id: playerId },
+        where: { player_id: player.users.id },
         orderBy: { created_at: 'desc' },
-        select: { rating: true }
+        select: { rating: true }  
       });
-      playerRatings.set(playerId.toString(), ratingRecord?.rating || 1500);
+      playerRatings.set(player.users.id.toString(), ratingRecord?.rating || 1500);
     }
 
     // 4. Find players who need more games
-    const playersNeedingGames: Array<{ id: bigint; gamesNeeded: number; rating: number }> = [];
-    for (const playerId of playerIds) {
-      const currentGames = playerGameCount.get(playerId.toString()) || 0;
+    const playersNeedingGames: Array<{ id: bigint; fullName: string; gamesNeeded: number; rating: number }> = [];
+    for (const player of activePlayers) {
+      const currentGames = playerGameCount.get(player.users.id.toString()) || 0;
       if (currentGames < targetGamesPerPlayer) {
         playersNeedingGames.push({
-          id: playerId,
+          id: player.users.id,
+          fullName: this.findFullNameById(player.users.id, registeredPlayers),
           gamesNeeded: targetGamesPerPlayer - currentGames,
-          rating: playerRatings.get(playerId.toString()) || 1500
+          rating: playerRatings.get(player.users.id.toString()) || 1500
         });
       }
     }
@@ -1269,7 +1299,7 @@ console.log("scheduleParsed", scheduleParsed);
     let schedulesUpdated = 0;
     let schedulesCreated = 0;
     const errors: string[] = [];
-
+    // console.log("playersNeedingGames", playersNeedingGames);
     // 5. First, fill schedules with missing opponents
     for (const schedule of schedulesWithMissingOpponent) {
       const existingPlayerIdStr = schedule.existingPlayerId.toString();
