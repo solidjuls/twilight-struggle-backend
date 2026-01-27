@@ -25,6 +25,7 @@ export class ScheduleService {
     pageSize,
     adminView,
     onlyPending,
+    noOpponent,
     orderBy,
     orderDirection
   }: {
@@ -34,6 +35,7 @@ export class ScheduleService {
     pageSize: number;
     adminView: boolean;
     onlyPending?: boolean;
+    noOpponent?: boolean;
     orderBy?: string;
     orderDirection?: string;
   }): Promise<ScheduleListResponse> {
@@ -64,6 +66,15 @@ export class ScheduleService {
     if (onlyPending) {
       where.AND.push({
         game_results_id: null
+      });
+    }
+
+    if (noOpponent) {
+      where.AND.push({
+        OR: [
+          { usa_player_id: null },
+          { ussr_player_id: null },
+        ],
       });
     }
 
