@@ -23,6 +23,7 @@ export interface GetSchedulesQueryDto {
   onlyPending?: string; // Filter only pending games (without results) - 'true' or 'false'
   orderBy?: 'dueDate' | 'gameDate' | 'tournamentName'; // Field to order by
   orderDirection?: 'asc' | 'desc'; // Order direction
+  noOpponent?: boolean; // Filter games where one of the players is null - 'true' or 'false'
 
   // Legacy parameters for backward compatibility
   uid?: string; // userId (legacy)

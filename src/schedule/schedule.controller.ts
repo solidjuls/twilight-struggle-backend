@@ -49,6 +49,7 @@ export class ScheduleController {
         page = '1',
         pageSize = '20',
         onlyPending,
+        noOpponent,
         orderBy = 'dueDate',
         orderDirection = 'asc',
         a = '0',
@@ -133,6 +134,7 @@ export class ScheduleController {
         page: parsedPage,
         pageSize: parsedPageSize,
         adminView,
+        noOpponent,
         onlyPending: parsedOnlyPending,
         orderBy: finalOrderBy,
         orderDirection: finalOrderDirection,
@@ -160,6 +162,33 @@ export class ScheduleController {
       );
     }
   }
+
+    @Get('players-with-missing-games')
+    async playersWithMissingGames(
+      @Query() query: any,
+      @CurrentUser() user: JwtPayloadDto,
+    ) {
+      try {
+        const { tid } = query;
+        const id = parseInt(tid);
+        console.log("tournamentId", id, tid, query);
+  
+        // const targetGames = body.targetGamesPerPlayer || 20;
+        const result = await this.scheduleService.getPlayersWithMissingGames(id, 20);
+  
+        return {
+          success: true,
+          message: 'Missing schedule pairs created',
+          ...result
+        };
+      } catch (error) {
+        console.error("CREATE MISSING PAIRS API Error:", error);
+        throw new HttpException(
+          error.message || 'Failed to create missing pairs',
+          error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
 
   @Post()
   async updateScheduleOrSubmit(
