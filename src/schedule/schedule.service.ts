@@ -254,6 +254,17 @@ export class ScheduleService {
     d: Date,
     gc: string
   ): Promise<ScheduleUpdateResult> {
+    // check the schedule does not exist already
+    const existingSchedule = await this.databaseService.schedule.findFirst({
+      where: {
+        tournaments_id: t,
+        usa_player_id: BigInt(usa),
+        ussr_player_id: BigInt(ussr),
+      }
+    });
+    if (existingSchedule) {
+      throw new Error('Schedule already exists');
+    } 
     const schedule = await this.databaseService.schedule.create({
       data: {
         tournaments_id: t,
@@ -373,5 +384,135 @@ export class ScheduleService {
     });
 
     return { success: true };
+  }
+
+  findFullNameById(id: bigint, registeredPlayers: any[]) {
+    const player = registeredPlayers.find(p => p.users.id === id);
+    return player ? `${player.users.first_name} ${player.users.last_name}` : 'Unknown Player';
+  }
+
+  async getPlayersWithMissingGames(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    // 1. Get all registered players for the tournament
+    // het first nameand last name from users table
+    const registeredPlayers = await this.databaseService.tournament_registration.findMany({
+      select: {
+        status: true,
+        users: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+          }
+        },
+      },
+      where: { tournamentId },
+    });
+
+    if (registeredPlayers.length < 2) {
+      throw new Error('Not enough registered players');
+    }
+
+    // 2. Get current schedule counts for each player
+    const schedules = await this.databaseService.schedule.findMany({
+      where: {
+        tournaments_id: tournamentId,
+      },
+      select: {
+        id: true,
+        usa_player_id: true,
+        ussr_player_id: true,
+        game_results_id: true,
+      }
+    });
+
+    // find the registered players with status forfeited
+    const forfeitedPlayers = registeredPlayers.filter(p => p.status === 'forfeited');
+    const activePlayers = registeredPlayers.filter(p => p.status !== 'forfeited');
+console.log("forfeitedPlayers", forfeitedPlayers);
+    // find players ids who have not a single schedule comparing schedules with registeredplayers
+    const playersWithoutSchedule = registeredPlayers.filter(p => {
+      return !schedules.find(sch => sch.usa_player_id === p.users.id || sch.ussr_player_id === p.users.id);
+    });
+
+    // set to null the ids from schedules locally where the player is in the forfeitedPlayers array
+    const schedulesWithMissingOpponent: Array<{
+      id: number;
+      existingPlayerId: bigint;
+      isUSA: boolean;
+    }> = [];
+    const playerGameCount = new Map<string, number>();
+
+    for (const player of registeredPlayers) {
+      playerGameCount.set(player.users.id.toString(), 0);
+    }
+
+    for (const player of forfeitedPlayers) { 
+      for (let schedule of schedules) {
+        if (schedule.game_results_id !== null) continue;
+
+        if (schedule.usa_player_id === player.users.id) {
+          schedule.usa_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.usa_player_id,
+            isUSA: true
+          });
+        }
+        if (schedule.ussr_player_id === player.users.id) {
+          schedule.ussr_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.ussr_player_id,
+            isUSA: false
+          });
+        }
+      }
+    }
+
+
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+
+      if (ussrId && usaId && playerGameCount.has(usaId)) {
+        playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+      }
+      if (ussrId && usaId && playerGameCount.has(ussrId)) {
+        playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+      }
+    }
+
+    // 3. Get ratings for all players
+    const playerRatings = new Map<string, number>();
+    for (const player of activePlayers) {
+      const ratingRecord = await this.databaseService.ratings_history.findFirst({
+        where: { player_id: player.users.id },
+        orderBy: { created_at: 'desc' },
+        select: { rating: true }  
+      });
+      playerRatings.set(player.users.id.toString(), ratingRecord?.rating || 1500);
+    }
+
+    // 4. Find players who need more games
+    const playersNeedingGames: Array<{ id: bigint; fullName: string; gamesNeeded: number; rating: number }> = [];
+    for (const player of activePlayers) {
+      const currentGames = playerGameCount.get(player.users.id.toString()) || 0;
+      if (currentGames < targetGamesPerPlayer) {
+        playersNeedingGames.push({
+          id: player.users.id,
+          fullName: this.findFullNameById(player.users.id, registeredPlayers),
+          gamesNeeded: targetGamesPerPlayer - currentGames,
+          rating: playerRatings.get(player.users.id.toString()) || 1500
+        });
+      }
+    }
+
+    // Sort by rating for pairing
+    playersNeedingGames.sort((a, b) => a.rating - b.rating);
+
+    let schedulesUpdated = 0;
+    let schedulesCreated = 0;
+    const errors: string[] = [];
+    console.log("playersNeedingGames", playersNeedingGames);
   }
 }

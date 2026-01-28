@@ -163,6 +163,33 @@ export class ScheduleController {
     }
   }
 
+    @Get('players-with-missing-games')
+    async playersWithMissingGames(
+      @Query() query: any,
+      @CurrentUser() user: JwtPayloadDto,
+    ) {
+      try {
+        const { tid } = query;
+        const id = parseInt(tid);
+        console.log("tournamentId", id, tid, query);
+  
+        // const targetGames = body.targetGamesPerPlayer || 20;
+        const result = await this.scheduleService.getPlayersWithMissingGames(id, 20);
+  
+        return {
+          success: true,
+          message: 'Missing schedule pairs created',
+          ...result
+        };
+      } catch (error) {
+        console.error("CREATE MISSING PAIRS API Error:", error);
+        throw new HttpException(
+          error.message || 'Failed to create missing pairs',
+          error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
   @Post()
   async updateScheduleOrSubmit(
     @Body() body: { data: UpdateScheduleDto },
