@@ -1,10 +1,12 @@
 WITH ordered_player_ratings AS
 (
     SELECT 
-        ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY created_at DESC) desc_player_rating_count,
+        ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY rh.created_at DESC) desc_player_rating_count,
         rating,
         player_id
-    FROM ratings_history
+    FROM ratings_history rh
+    INNER JOIN game_results gr ON gr.id = rh.game_result_id
+    WHERE gr.game_date > DATE_SUB(NOW(), INTERVAL 2 YEAR)
 )
 
 , get_all_player_rankings AS
