@@ -1600,7 +1600,7 @@ console.log("forfeitedPlayers", forfeitedPlayers);
     }
 
     return {
-      totalPlayers: playerIds.length,
+      totalPlayers: 0,// playerIds.length,
       playersNeedingGames: playersNeedingGames.length,
       schedulesWithMissingOpponent: schedulesWithMissingOpponent.length,
       schedulesUpdated,
