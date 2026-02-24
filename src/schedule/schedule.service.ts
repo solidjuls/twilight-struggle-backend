@@ -585,6 +585,44 @@ console.log("forfeitedPlayers", forfeitedPlayers);
     // Sort by rating for pairing
     playersNeedingGames.sort((a, b) => a.rating - b.rating);
 
+    const suggestedPairings = []
+    // 5. Suggest pairings
+    for (const player of playersNeedingGames) {
+      // if player exists in suggestedPairings, skip
+        if (suggestedPairings.find(p => p.player1 === player.fullName || p.player2 === player.fullName)) continue;
+
+      for (const otherPlayer of playersNeedingGames) {
+        if (player.id === otherPlayer.id) continue;
+        if (suggestedPairings.find(p => p.player1 === otherPlayer.fullName || p.player2 === otherPlayer.fullName)) continue;
+
+        const existingSchedule = await this.databaseService.schedule.findFirst({
+          where: {
+            tournaments_id: 318,
+            OR: [
+              {
+                usa_player_id: BigInt(player.id),
+                ussr_player_id: BigInt(otherPlayer.id),
+              },
+              {
+                usa_player_id: BigInt(otherPlayer.id),
+                ussr_player_id: BigInt(player.id),
+              },
+            ],
+          },
+        });
+        
+        if (!existingSchedule) {
+          suggestedPairings.push({
+            player1: player.fullName,
+            player2: otherPlayer.fullName,
+          });
+          console.log(`SUGGESTED PAIRING: ${player.fullName} vs ${otherPlayer.fullName}`);
+          break;
+        }
+
+      }
+    }
+
     let schedulesUpdated = 0;
     let schedulesCreated = 0;
     const errors: string[] = [];
