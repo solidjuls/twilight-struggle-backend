@@ -115,6 +115,7 @@ export class ScheduleService {
         id: true,
         game_results_id: true,
         due_date: true,
+        random_sides: true,
         tournaments: {
           select: {
             tournament_name: true,
@@ -157,6 +158,7 @@ export class ScheduleService {
       gameDate: result.game_results?.game_date?.toISOString() || null,
       dueDate: result.due_date.toISOString(),
       gameCode: result.game_code,
+      randomSides: result.random_sides,
       id: result.id.toString(),
       gameResultsId: result.game_results_id?.toString() || null,
       nameUsa: `${result.users_schedule_usa_player_idTousers?.first_name || ''} ${result.users_schedule_usa_player_idTousers?.last_name || ''}`,

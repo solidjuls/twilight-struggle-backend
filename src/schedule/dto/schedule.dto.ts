@@ -3,6 +3,7 @@ export interface ScheduleDto {
   gameWinner: string | null;
   gameDate: string | null;
   dueDate: string;
+  randomSides?: boolean;
   gameCode: string;
   gameResultsId: string | null;
   nameUsa: string;
