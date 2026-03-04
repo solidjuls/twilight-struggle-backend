@@ -497,13 +497,14 @@ export class ScheduleService {
         usa_player_id: true,
         ussr_player_id: true,
         game_results_id: true,
+        game_code: true,
       }
     });
 
     // find the registered players with status forfeited
     const forfeitedPlayers = registeredPlayers.filter(p => p.status === 'forfeited');
     const activePlayers = registeredPlayers.filter(p => p.status !== 'forfeited');
-console.log("forfeitedPlayers", forfeitedPlayers);
+
     // find players ids who have not a single schedule comparing schedules with registeredplayers
     const playersWithoutSchedule = registeredPlayers.filter(p => {
       return !schedules.find(sch => sch.usa_player_id === p.users.id || sch.ussr_player_id === p.users.id);
@@ -544,16 +545,30 @@ console.log("forfeitedPlayers", forfeitedPlayers);
       }
     }
 
-
+    const gameCodes: string[] = []
     for (const schedule of schedules) {
       const usaId = schedule.usa_player_id?.toString();
       const ussrId = schedule.ussr_player_id?.toString();
+
+      // hack to compensate for DDB errors leading to inconsistent shcedule data
+      if (schedule.game_results_id !== null && ((!usaId && ussrId) || (usaId && !ussrId))) {
+        if (usaId) {
+          playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+        }
+        if (ussrId) {
+          playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+        }
+      }
 
       if (ussrId && usaId && playerGameCount.has(usaId)) {
         playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
       }
       if (ussrId && usaId && playerGameCount.has(ussrId)) {
         playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+      }
+
+      if (schedule.game_results_id === null && ((!usaId && ussrId) || (usaId && !ussrId))) {
+        !gameCodes.includes(schedule.game_code) && gameCodes.push(schedule.game_code);
       }
     }
 
@@ -585,13 +600,16 @@ console.log("forfeitedPlayers", forfeitedPlayers);
     // Sort by rating for pairing
     playersNeedingGames.sort((a, b) => a.rating - b.rating);
 
+    // remove Otto Wefer from playersNeedingGames if he exists
+    const playersNeedingGamesFiltered = playersNeedingGames.filter(p => p.fullName !== 'Otto Wefer');
+
     const suggestedPairings = []
     // 5. Suggest pairings
-    for (const player of playersNeedingGames) {
+    for (const player of playersNeedingGamesFiltered) {
       // if player exists in suggestedPairings, skip
         if (suggestedPairings.find(p => p.player1 === player.fullName || p.player2 === player.fullName)) continue;
 
-      for (const otherPlayer of playersNeedingGames) {
+      for (const otherPlayer of playersNeedingGamesFiltered) {
         if (player.id === otherPlayer.id) continue;
         if (suggestedPairings.find(p => p.player1 === otherPlayer.fullName || p.player2 === otherPlayer.fullName)) continue;
 
@@ -616,7 +634,7 @@ console.log("forfeitedPlayers", forfeitedPlayers);
             player1: player.fullName,
             player2: otherPlayer.fullName,
           });
-          console.log(`SUGGESTED PAIRING: ${player.fullName} vs ${otherPlayer.fullName}`);
+          // console.log(`SUGGESTED PAIRING: ${player.fullName} vs ${otherPlayer.fullName}`);
           break;
         }
 
@@ -626,6 +644,51 @@ console.log("forfeitedPlayers", forfeitedPlayers);
     let schedulesUpdated = 0;
     let schedulesCreated = 0;
     const errors: string[] = [];
-    console.log("playersNeedingGames", playersNeedingGames);
+    console.log("suggestedPairings", suggestedPairings);
+     console.log("gameCodes", gameCodes);
+
+    // create a schedule for each suggested pairing, the game code should be random 4 char string, starting by J
+    for (const pairing of suggestedPairings) {
+      const gameCode = `J${Math.random().toString(36).substring(2, 6)}`;
+      const usaPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player1);
+      const ussrPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player2);
+      // date Apr 1st
+      const dueDate = new Date('2025-04-01');
+      //   await this.databaseService.schedule.create({
+      //   data: {
+      //     tournaments_id: 318,
+      //     game_code: gameCode,
+      //     usa_player_id: BigInt(usaPlayer.id),
+      //     ussr_player_id: BigInt(ussrPlayer.id),
+      //     due_date: dueDate,
+      //   }
+      // });
+      schedulesCreated++;
+    }
+   
+ console.log("schedulesCreated", schedulesCreated);
+      // remove all schedules with the game code in the array, except 'Otto Wefer'
+    const scheduleIds = await this.databaseService.schedule.findMany({
+      where: {
+        game_code: {
+          in: gameCodes,
+        },
+        tournaments_id: 318,
+      },
+      select: {
+        id: true,
+      }
+    });
+
+    const filteredScheduleIds = scheduleIds.filter(s => s.id !== 8947);
+  console.log("scheduleIds", filteredScheduleIds);
+    // const deleted = await this.databaseService.schedule.deleteMany({
+    //   where: {
+    //     id: {
+    //       in: filteredScheduleIds.map(s => s.id),
+    //     }
+    //   },
+    // });
+    // console.log("deleted", deleted);
   }
 }
