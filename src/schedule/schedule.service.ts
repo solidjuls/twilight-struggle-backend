@@ -601,7 +601,7 @@ export class ScheduleService {
     playersNeedingGames.sort((a, b) => a.rating - b.rating);
 
     // remove Otto Wefer from playersNeedingGames if he exists
-    const playersNeedingGamesFiltered = playersNeedingGames.filter(p => p.fullName !== 'Otto Wefer');
+    const playersNeedingGamesFiltered = playersNeedingGames// .filter(p => p.fullName !== 'Otto Wefer' || 'Alejandro Granese');
 
     const suggestedPairings = []
     // 5. Suggest pairings
@@ -653,8 +653,8 @@ export class ScheduleService {
       const usaPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player1);
       const ussrPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player2);
       // date Apr 1st
-      const dueDate = new Date('2025-04-01');
-      //   await this.databaseService.schedule.create({
+      const dueDate = new Date('2025-04-02');
+      // await this.databaseService.schedule.create({
       //   data: {
       //     tournaments_id: 318,
       //     game_code: gameCode,
@@ -666,7 +666,7 @@ export class ScheduleService {
       schedulesCreated++;
     }
    
- console.log("schedulesCreated", schedulesCreated);
+ console.log("schedulesCreated", schedulesCreated, playersNeedingGamesFiltered);
       // remove all schedules with the game code in the array, except 'Otto Wefer'
     const scheduleIds = await this.databaseService.schedule.findMany({
       where: {
