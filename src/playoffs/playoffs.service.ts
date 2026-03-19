@@ -104,6 +104,8 @@ export class PlayoffsService {
       include: {
         users: {
           include: {
+            first_name: true,
+            last_name: true,
             countries: true,
           },
         },
@@ -118,9 +120,7 @@ export class PlayoffsService {
       seed: entry.seed,
       playoffSquare: entry.playoffSquare || '',
       nextSquare: entry.nextSquare || '',
-      userName: entry.users
-        ? `${entry.users.first_name || ''} ${entry.users.last_name || ''}`.trim()
-        : undefined,
+      userName: entry.users ? `${entry.users.first_name} ${entry.users.last_name }`.trim() : undefined,
       countryCode: entry.users?.countries?.tld_code || undefined,
     }));
   }
