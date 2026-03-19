@@ -236,7 +236,7 @@ export class StandingsService {
     
     // Sort players by Win Rate and then by SoS
     const sortedPlayersByWinRate = filteredPlayersByDivision.sort((a, b) => {
-      console.log("comparing", a.name, b.name, a.winRate, b.winRate, a.sos, b.sos);
+      // console.log("comparing", a.name, b.name, a.winRate, b.winRate, a.sos, b.sos);
       if (b.winRate === a.winRate) {
         return b.sos - a.sos;
       }

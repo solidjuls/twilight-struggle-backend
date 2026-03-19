@@ -194,6 +194,7 @@ export class TournamentsService {
         waitlist: waitlist || false,
         starting_date: startingDate || null,
         description: description || null,
+        type: 'league',
       },
     });
 
