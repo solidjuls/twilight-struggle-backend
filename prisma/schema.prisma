@@ -191,6 +191,7 @@ model tournaments {
   id                      Int                       @id @default(autoincrement())
   tournament_name         String                    @db.VarChar(255)
   status_id               Int
+  parent_id               Int?
   created_at              DateTime?                 @default(now()) @db.Timestamp(0)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
   description             String?                   @db.Text
@@ -204,8 +205,11 @@ model tournaments {
   tournament_registration tournament_registration[]
   tournament_waitlist     tournament_waitlist[]
   TournamentStatus        TournamentStatus          @relation(fields: [status_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tournaments_TournamentStatus_FK")
+  parent                  tournaments?              @relation("SubTournaments", fields: [parent_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  children                tournaments[]             @relation("SubTournaments")
 
   @@index([status_id], map: "tournaments_TournamentStatus_FK")
+  @@index([parent_id], map: "tournaments_parent_id_FK")
 }
 
 model schedule {

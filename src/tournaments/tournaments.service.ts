@@ -217,6 +217,41 @@ export class TournamentsService {
     return newTournament;
   }
 
+  async createSubtournament(
+    parentId: number,
+    subtournamentData: {
+      tournamentName: string;
+      description?: string;
+      startingDate?: Date;
+    },
+  ): Promise<any> {
+    const { tournamentName, description, startingDate } = subtournamentData;
+
+    // Verify parent tournament exists
+    const parentTournament = await this.databaseService.tournaments.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parentTournament) {
+      throw new Error('Parent tournament not found');
+    }
+
+    // Create the subtournament with type 'playoff' and link to parent
+    const subtournament = await this.databaseService.tournaments.create({
+      data: {
+        tournament_name: tournamentName,
+        status_id: 1, // Default status
+        parent_id: parentId,
+        type: 'playoff',
+        description: description || null,
+        starting_date: startingDate || null,
+        waitlist: false,
+      },
+    });
+
+    return subtournament;
+  }
+
   async updateTournament(id: number, status: number): Promise<any> {
     return await this.databaseService.tournaments.update({
       where: {

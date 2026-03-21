@@ -103,10 +103,14 @@ export class PlayoffsService {
       where: { tournament_id: tournamentId },
       include: {
         users: {
-          include: {
+          select: {
             first_name: true,
             last_name: true,
-            countries: true,
+            countries: {
+              select: {
+                tld_code: true,
+              },
+            },
           },
         },
       },
@@ -120,7 +124,7 @@ export class PlayoffsService {
       seed: entry.seed,
       playoffSquare: entry.playoffSquare || '',
       nextSquare: entry.nextSquare || '',
-      userName: entry.users ? `${entry.users.first_name} ${entry.users.last_name }`.trim() : undefined,
+      userName: entry.users ? `${entry.users.first_name} ${entry.users.last_name}`.trim() : undefined,
       countryCode: entry.users?.countries?.tld_code || undefined,
     }));
   }

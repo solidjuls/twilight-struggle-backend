@@ -21,7 +21,8 @@ import {
   UpdateTournamentDto,
   UpdateTournamentStatusDto,
   AddTournamentAdminDto,
-  RemoveTournamentAdminDto
+  RemoveTournamentAdminDto,
+  CreateSubtournamentDto
 } from './dto/tournament.dto';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/auth.decorators';
@@ -650,6 +651,63 @@ export class TournamentsController {
       throw new HttpException(
         error.message || 'Migration failed',
         error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // POST /api/tournaments/:id/subtournament - Create a subtournament (playoff) linked to parent
+  @Post(':id/subtournament')
+  async createSubtournament(
+    @Param('id') parentId: string,
+    @Body() body: CreateSubtournamentDto,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    const id = parseInt(parentId);
+    if (isNaN(id)) {
+      throw new HttpException('Invalid tournament ID', HttpStatus.BAD_REQUEST);
+    }
+
+    if (!body.tournamentName) {
+      throw new HttpException('Tournament name is required', HttpStatus.BAD_REQUEST);
+    }
+
+    try {
+      // Check if user has admin permissions for the parent tournament
+      const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        id,
+      );
+
+      if (!isAdmin) {
+        throw new HttpException('Insufficient permissions to create subtournament', HttpStatus.FORBIDDEN);
+      }
+
+      const subtournament = await this.tournamentsService.createSubtournament(id, {
+        tournamentName: body.tournamentName,
+        description: body.description,
+        startingDate: body.startingDate ? new Date(body.startingDate) : undefined,
+      });
+
+      return {
+        success: true,
+        message: 'Subtournament created successfully',
+        subtournament: {
+          id: subtournament.id,
+          tournamentName: subtournament.tournament_name,
+          parentId: subtournament.parent_id,
+          type: subtournament.type,
+          description: subtournament.description,
+          startingDate: subtournament.starting_date,
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        error.message || 'Failed to create subtournament',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

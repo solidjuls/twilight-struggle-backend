@@ -20,7 +20,7 @@ export class GamesService {
     private readonly ratingService: RatingService,
   ) {}
 
-  private createPrismaFilter(filter: GameFilterDto): any {
+  private async createPrismaFilter(filter: GameFilterDto): Promise<any> {
     const prismaFilter: any = {};
 
     if (filter.id) {
@@ -51,7 +51,18 @@ export class GamesService {
     }
 
     if (filter.toFilter && filter.toFilter.length > 0) {
-      prismaFilter.tournament_id = { in: filter.toFilter };
+      // Include child tournament IDs (subtournaments) - 1 level only
+      const childTournaments = await this.databaseService.tournaments.findMany({
+        where: {
+          parent_id: { in: filter.toFilter },
+        },
+        select: {
+          id: true,
+        },
+      });
+      const childIds = childTournaments.map(t => t.id);
+      const allTournamentIds = [...filter.toFilter, ...childIds];
+      prismaFilter.tournament_id = { in: allTournamentIds };
     }
 
     if (filter.video === true) {
@@ -115,7 +126,7 @@ export class GamesService {
     pageSize = pageSize || 20;
     const skip = (page - 1) * pageSize;
 
-    const prismaFilter = this.createPrismaFilter(filter);
+    const prismaFilter = await this.createPrismaFilter(filter);
 
     const totalRows = await this.databaseService.game_results.count({
       where: prismaFilter,

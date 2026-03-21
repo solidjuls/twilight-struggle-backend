@@ -95,3 +95,9 @@ export interface UpdateTournamentStatusDto {
   tournamentId: number;
   status: number; // 2=START_REGISTRATION, 3=CLOSE_REGISTRATION, 4=START_TOURNAMENT, 5=CLOSE_TOURNAMENT
 }
+
+export interface CreateSubtournamentDto {
+  tournamentName: string;
+  description?: string;
+  startingDate?: Date;
+}
