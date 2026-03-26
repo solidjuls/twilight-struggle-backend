@@ -4,6 +4,7 @@ import {
   CreatePlayoffBracketResultDto,
   PlayoffBracketResponseDto,
   PlayoffEntryDto,
+  PlayoffSummaryDto,
 } from './dto/playoffs.dto';
 
 /** Number of days to add to current date for matchup due dates */
@@ -128,5 +129,23 @@ export class PlayoffsService {
       countryCode: entry.users?.countries?.tld_code || undefined,
     }));
   }
-}
 
+  /**
+   * Returns all playoffs (tournaments with type 'playoff').
+   */
+  async getAllPlayoffs(): Promise<PlayoffSummaryDto[]> {
+    const playoffs = await this.databaseService.tournaments.findMany({
+      where: { type: 'playoff' },
+      select: {
+        id: true,
+        tournament_name: true,
+      },
+      orderBy: { id: 'desc' },
+    });
+
+    return playoffs.map((playoff) => ({
+      id: playoff.id,
+      name: playoff.tournament_name,
+    }));
+  }
+}

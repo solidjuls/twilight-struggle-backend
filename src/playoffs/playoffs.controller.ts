@@ -12,6 +12,7 @@ import {
   CreatePlayoffBracketResultDto,
   PlayoffBracketResponseDto,
   PlayoffEntryDto,
+  PlayoffSummaryDto,
 } from './dto/playoffs.dto';
 
 @Controller('playoffs')
@@ -41,6 +42,23 @@ export class PlayoffsController {
         throw error;
       }
       console.error('[Playoffs POST]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * GET /api/playoffs/getAll
+   * Returns all playoffs names and IDs.
+   */
+  @Get('getAll')
+  async getAllPlayoffs(): Promise<PlayoffSummaryDto[]> {
+    try {
+      return await this.playoffsService.getAllPlayoffs();
+    } catch (error) {
+      console.error('[Playoffs GET All]', error);
       throw new HttpException(
         'Internal Server Error',
         HttpStatus.INTERNAL_SERVER_ERROR,

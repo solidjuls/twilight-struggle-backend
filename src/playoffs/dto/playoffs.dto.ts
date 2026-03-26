@@ -24,3 +24,7 @@ export interface CreatePlayoffBracketResultDto {
   schedulesCreated: number;
 }
 
+export interface PlayoffSummaryDto {
+  id: number;
+  name: string;
+}
