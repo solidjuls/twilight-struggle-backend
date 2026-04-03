@@ -219,6 +219,35 @@ export class GamesService {
     };
   }
 
+  async getGameByUsers(idPlayer1: bigint, idPlayer2: bigint, tId: number) {
+    const games = await this.databaseService.game_results.findMany({
+      select: {
+        id: true,
+        game_winner: true,
+        usa_player_id: true,
+        ussr_player_id: true
+      },
+      where: {
+        tournament_id: tId,
+        OR: [
+          {
+            AND: [
+              { usa_player_id: idPlayer1 },
+              { ussr_player_id: idPlayer2 }
+            ]
+          },
+          {
+            AND: [
+              { usa_player_id: idPlayer2 },
+              { ussr_player_id: idPlayer1 }
+            ]
+          }
+        ]
+      }
+    })
+    return games
+  }
+
   async getGameById(id: string) {
     const game = await this.databaseService.game_results.findFirst({
       select: {

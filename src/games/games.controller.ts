@@ -20,15 +20,24 @@ import {
   SubmitGameRequestDto,
   RecreateGameDto,
   GetGameChartQueryDto,
+  SubmitGameDto,
 } from './dto/game.dto';
 import { ScheduleService } from 'src/schedule/schedule.service';
+import { PlayoffsService } from 'src/playoffs/playoffs.service';
+import { EmailService, SMTPConfig } from 'src/email/email.service';
+import { UsersService } from 'src/users/users.service';
+import { UserDetailDto } from 'src/users/dto/users.dto';
 
 @Controller('games')
 @UseGuards(JwtAuthGuard)
 export class GamesController {
   constructor(
     private readonly gamesService: GamesService,
-    private readonly scheduleService: ScheduleService
+    private readonly scheduleService: ScheduleService,
+    private readonly playoffsService: PlayoffsService,
+    private readonly emailService: EmailService,
+    private readonly usersService: UsersService
+
   ) {}
 
   @Get()
@@ -172,7 +181,106 @@ export class GamesController {
     }
   }
 
+  getSeriesWinner(games: {
+    id: bigint;
+    usa_player_id: bigint;
+    ussr_player_id: bigint;
+    game_winner: string;
+}[], bestOf: number): bigint | null {
+    if (games.length === 0) return null;
 
+    const countWins = new Map<number, number>();
+    for (const game of games) {
+      if (game.game_winner === "1") {
+        const usaId = Number(game.usa_player_id)
+        countWins.set(usaId, (countWins.get(usaId) || 0) + 1)
+      }
+      if (game.game_winner === "2") {
+        const ussrId = Number(game.ussr_player_id)
+        countWins.set(ussrId, (countWins.get(ussrId) || 0) + 1)
+      }
+    }
+    // console.log("games", games, Math.ceil(bestOf / 2), usaWins, ussrWins)
+
+    const neededToWin = Math.ceil(bestOf / 2);
+    let winnerId = null
+    for (const [key, value] of countWins) {
+      if (value === neededToWin) winnerId = key;
+    }
+    return winnerId;
+  }
+
+  async updateITSLPlayoffBracket(data: SubmitGameDto) {
+    const userId = data.gameWinner === "1" ? BigInt(data.usaPlayerId) : BigInt(data.ussrPlayerId)
+    const tId = data.tournamentId
+
+    // Check best_of_games
+    const BO = await this.playoffsService.getBOFromPlayoff(userId, tId)
+
+    if (BO > 1) {
+      // Select on game_results games by tId and the 2 players
+      const games = await this.gamesService.getGameByUsers(BigInt(data.usaPlayerId), BigInt(data.ussrPlayerId), Number(data.tournamentId))
+
+      const winnerId = this.getSeriesWinner(games, BO)
+      console.log("winnerId", winnerId)
+      // if there's a winner considering BO
+      if (winnerId) {
+        // update bracket, create schedule and send email
+        const userIds = await this.playoffsService.updateBracketFromSubmit(userId, Number(data.tournamentId))
+
+        console.log("userIds", userIds)
+        let users: UserDetailDto[] = []
+        if (userIds.length === 2) {
+          for (const userId of userIds) {
+            const user = await this.usersService.getUserById(userId.toString())
+            users.push(user)
+          }
+        }
+        const smtpConfig: SMTPConfig = {
+          host: process.env.SMTP_HOST || 'localhost',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          user: process.env.SMTP_USER_JUNTA || '',
+          password: process.env.SMTP_PWD_JUNTA || '',
+        };
+        console.log("smtpConfig", smtpConfig)
+
+        const playerOne = `${users[0].first_name} ${users[0].last_name} (Playdek: ${users[0].playdek_name}) - Timezone: ${users[0].timezone_id}`
+        const playerTwo = `${users[1].first_name} ${users[1].last_name} (Playdek: ${users[1].playdek_name}) - Timezone: ${users[1].timezone_id}`
+
+        this.scheduleService.addSchedulePlayers(
+          users[0].id,
+          users[1].id,
+          Number(data.tournamentId),
+          new Date(),
+          'J002'
+        )
+
+        const emailSent = await this.emailService.sendPlayoffsEmail(
+          ['juli.arnalot@gmail.com'],
+          'Twilight Struggle Playoffs',
+          '12-12-2026',
+          playerOne,
+          playerTwo,
+          smtpConfig
+        );
+        console.log("email sent")
+      } else {
+        // create a new schedule with sides switched
+        this.scheduleService.addSchedulePlayers(
+          data.ussrPlayerId,
+          data.usaPlayerId,
+          Number(data.tournamentId),
+          new Date(),
+          'J002'
+        )
+      }
+    }
+      
+
+    // send email with newly schedule created
+    
+  }
 
   @Post('submit')
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
@@ -210,6 +318,11 @@ export class GamesController {
           gameResultId: result.id,
           scheduleId: Number(submitGameRequest.data.scheduleId),
         });
+
+        // if tournament is ITSL main playoff
+        if (data.tournamentId === "325") {
+          this.updateITSLPlayoffBracket(data)
+        }
       }
       return result;
     } catch (error) {

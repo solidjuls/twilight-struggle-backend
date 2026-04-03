@@ -20,6 +20,62 @@ export interface SMTPConfig {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private readonly playoffsBodyEmail = (tournamentName: string, dueDate: string, playerOne: string, playerTwo: string) => `
+<p>Dear players,</p>
+
+<p>Your next ${tournamentName} game is ready!</p>
+
+<p>Just a friendly reminder that the due date for this Game is ${dueDate}</p>
+
+<p><strong>Below is the information for your game:</strong></p>
+
+<p>
+Due Date: ${dueDate}<br>
+Higher seed Player: ${playerOne} <br>
+Lower seed Player: ${playerTwo} 
+</p>
+
+<p>(Both players are copied in this email, so you can simply reply all and remove my address for scheduling.)</p>
+
+<p>
+Recommended duration: 60 minutes<br>
+<em>*This duration is calculated based on your preferences in the form, but you can agree on a different duration. If no agreement is reached, the default duration will be 60 minutes.</em>
+</p>
+
+<p>
+To help you schedule your game, you can use this convenient timezone converter:<br>
+<a href="https://time.is/compare/2000_15_April_2025_in_Paris/Paris">https://time.is/compare/2000_15_April_2025_in_Paris/Paris</a>
+</p>
+
+<p>
+Once the game is completed, please remember to report the result immediately here:<br>
+<a href="https://twilight-struggle.com/schedule">https://twilight-struggle.com/schedule</a>
+</p>
+
+<p>
+If you encounter any difficulties in contacting the other player, please report it by replying to this email. Otherwise, failure to submit the result on time may result in a penalty.
+</p>
+
+<p>
+Remember that you can find the complete schedule here:<br>
+<a href="https://twilight-struggle.com/schedule">https://twilight-struggle.com/schedule</a>
+</p>
+
+<p>Good luck to you both,</p>
+
+<p><strong>ITS Junta</strong></p>
+`
+
+  async sendPlayoffsEmail(destEmails: string[], tournamentName: string, dueDate: string, namePlayerOne: string, namePlayerTwo: string, smtpConfig: SMTPConfig) {
+    const email: EmailOptions = {
+      subject: tournamentName,
+      text: "",
+      html: this.playoffsBodyEmail(tournamentName, dueDate, namePlayerOne, namePlayerTwo),
+      to: destEmails
+    }
+
+    this.sendEmail(email, smtpConfig)
+  }
 
   /**
    * Send email using provided SMTP configuration

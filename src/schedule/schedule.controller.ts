@@ -101,7 +101,7 @@ export class ScheduleController {
       // if (finalUserId) {
       //   const openTournament = ongoingUserTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
       //   console.log("parsedTournamentIds1", parsedTournamentIds, adminView, finalUserId, openTournament);
-      //   if (openTournament.length === 0) {
+      //   if (openTournament.length === 0) { 
       //     return {
       //       results: [],
       //       totalRows: 0,

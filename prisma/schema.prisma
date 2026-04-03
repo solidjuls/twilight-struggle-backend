@@ -191,13 +191,13 @@ model tournaments {
   id                      Int                       @id @default(autoincrement())
   tournament_name         String                    @db.VarChar(255)
   status_id               Int
-  parent_id               Int?
   created_at              DateTime?                 @default(now()) @db.Timestamp(0)
   updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
   description             String?                   @db.Text
   starting_date           DateTime?                 @db.Date
   waitlist                Boolean?
   type                    tournaments_type
+  parent_id               Int?
   game_results            game_results[]
   playoff_bracket         playoff_bracket[]
   schedule                schedule[]
@@ -205,7 +205,7 @@ model tournaments {
   tournament_registration tournament_registration[]
   tournament_waitlist     tournament_waitlist[]
   TournamentStatus        TournamentStatus          @relation(fields: [status_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tournaments_TournamentStatus_FK")
-  parent                  tournaments?              @relation("SubTournaments", fields: [parent_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  parent                  tournaments?              @relation("SubTournaments", fields: [parent_id], references: [id], onUpdate: NoAction)
   children                tournaments[]             @relation("SubTournaments")
 
   @@index([status_id], map: "tournaments_TournamentStatus_FK")
@@ -287,11 +287,12 @@ model hall_of_fame {
 
 model playoff_bracket {
   userId        BigInt?      @db.UnsignedBigInt
-  playoffSquare String?      @db.VarChar(100)
+  playoffSquare String       @unique(map: "playoffSquare_unique") @db.VarChar(100)
   nextSquare    String?      @db.VarChar(100)
   tournament_id Int?
   id            Int          @id @default(autoincrement())
   seed          Int?
+  best_of_games Int?
   tournaments   tournaments? @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_tournament")
   users         users?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_user")
 
