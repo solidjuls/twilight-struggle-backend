@@ -287,7 +287,7 @@ model hall_of_fame {
 
 model playoff_bracket {
   userId        BigInt?      @db.UnsignedBigInt
-  playoffSquare String       @unique(map: "playoffSquare_unique") @db.VarChar(100)
+  playoffSquare String       @db.VarChar(100)
   nextSquare    String?      @db.VarChar(100)
   tournament_id Int?
   id            Int          @id @default(autoincrement())

@@ -28,3 +28,19 @@ export interface PlayoffSummaryDto {
   id: number;
   name: string;
 }
+
+export interface CreatePlayoffScheduleDto {
+  usaPlayerId: string;
+  ussrPlayerId: string;
+  tournamentId: number;
+  tournamentName: string;
+  gameCode: string;
+  dueDateDays: number; // days to add to current date
+}
+
+export interface CreatePlayoffScheduleResultDto {
+  success: boolean;
+  message: string;
+  scheduleId?: number;
+  emailSent?: boolean;
+}

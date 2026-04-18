@@ -53,6 +53,7 @@ export class PlayoffsService {
     });
     
     const nextSquare = this.highestRValue(userBrackets.map(item => item.nextSquare))
+    const nextItem = userBrackets.find(item => item.nextSquare === nextSquare)
     const squareForEmail = await this.databaseService.playoff_bracket.update({
       data: {
         userId,
@@ -61,7 +62,8 @@ export class PlayoffsService {
         nextSquare: true
       },
       where: {
-        playoffSquare: nextSquare
+        playoffSquare: nextItem.nextSquare,
+        id: nextItem.id
       }
     })
     const playersFromNewBracket = await this.databaseService.playoff_bracket.findMany({
@@ -111,39 +113,39 @@ export class PlayoffsService {
       data: bracketData,
     });
 
-    const matchupsByNextSquare = new Map<string, typeof data>();
-    for (const entry of data) {
-      const existing = matchupsByNextSquare.get(entry.nextSquare) || [];
-      existing.push(entry);
-      matchupsByNextSquare.set(entry.nextSquare, existing);
-    }
+    // const matchupsByNextSquare = new Map<string, typeof data>();
+    // for (const entry of data) {
+    //   const existing = matchupsByNextSquare.get(entry.nextSquare) || [];
+    //   existing.push(entry);
+    //   matchupsByNextSquare.set(entry.nextSquare, existing);
+    // }
 
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + PLAYOFF_MATCHUP_DUE_DAYS);
+    // const dueDate = new Date();
+    // dueDate.setDate(dueDate.getDate() + PLAYOFF_MATCHUP_DUE_DAYS);
 
-    let schedulesCreated = 0;
-    for (const [nextSquare, players] of matchupsByNextSquare) {
-      if (players.length === 2 && players[0].userId && players[1].userId) {
-        // Assign USA/USSR by order, set random_sides to true
-        await this.databaseService.schedule.create({
-          data: {
-            tournaments_id: tournamentId,
-            game_code: `P${nextSquare}`,
-            usa_player_id: BigInt(players[0].userId),
-            ussr_player_id: BigInt(players[1].userId),
-            due_date: dueDate,
-            random_sides: true,
-          },
-        });
-        schedulesCreated++;
-      }
-    }
+    // let schedulesCreated = 0;
+    // for (const [nextSquare, players] of matchupsByNextSquare) {
+    //   if (players.length === 2 && players[0].userId && players[1].userId) {
+    //     // Assign USA/USSR by order, set random_sides to true
+    //     await this.databaseService.schedule.create({
+    //       data: {
+    //         tournaments_id: tournamentId,
+    //         game_code: `P${nextSquare}`,
+    //         usa_player_id: BigInt(players[0].userId),
+    //         ussr_player_id: BigInt(players[1].userId),
+    //         due_date: dueDate,
+    //         random_sides: true,
+    //       },
+    //     });
+    //     schedulesCreated++;
+    //   }
+    // }
 
     return {
       success: true,
       message: 'Playoff bracket created successfully',
       bracketEntriesCreated: data.length,
-      schedulesCreated,
+      schedulesCreated: 0,
     };
   }
 
