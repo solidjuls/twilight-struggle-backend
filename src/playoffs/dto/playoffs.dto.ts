@@ -1,4 +1,5 @@
 export interface PlayoffEntryDto {
+  id?: number;
   tournamentId: number;
   nextSquare: string;
   playoffSquare: string;
@@ -43,4 +44,10 @@ export interface CreatePlayoffScheduleResultDto {
   message: string;
   scheduleId?: number;
   emailSent?: boolean;
+}
+
+export interface UpdatePlayoffBracketResultDto {
+  success: boolean;
+  message: string;
+  updatedEntries: number;
 }

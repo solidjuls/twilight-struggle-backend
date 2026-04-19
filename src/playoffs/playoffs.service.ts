@@ -5,6 +5,7 @@ import {
   PlayoffBracketResponseDto,
   PlayoffEntryDto,
   PlayoffSummaryDto,
+  UpdatePlayoffBracketResultDto,
 } from './dto/playoffs.dto';
 import { find } from 'rxjs';
 
@@ -202,5 +203,48 @@ export class PlayoffsService {
       id: playoff.id,
       name: playoff.tournament_name,
     }));
+  }
+
+  /**
+   * Updates playoff bracket entries by their IDs.
+   */
+  async updatePlayoffBracket(
+    data: PlayoffEntryDto[],
+  ): Promise<UpdatePlayoffBracketResultDto> {
+    if (!data || data.length === 0) {
+      throw new HttpException(
+        'Bracket data is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    let updatedCount = 0;
+
+    for (const entry of data) {
+      if (!entry.id) {
+        throw new HttpException(
+          'Each bracket entry must have an id for update',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      await this.databaseService.playoff_bracket.update({
+        where: { id: Number(entry.id) },
+        data: {
+          tournament_id: entry.tournamentId,
+          userId: entry.userId ? BigInt(entry.userId) : null,
+          seed: entry.seed ?? null,
+          playoffSquare: entry.playoffSquare,
+          nextSquare: entry.nextSquare,
+        },
+      });
+      updatedCount++;
+    }
+
+    return {
+      success: true,
+      message: 'Playoff bracket updated successfully',
+      updatedEntries: updatedCount,
+    };
   }
 }

@@ -226,16 +226,15 @@ export class GamesController {
       // if there's a winner considering BO
       if (winnerId) {
         // update bracket, create schedule and send email
-        const userIds = await this.playoffsService.updateBracketFromSubmit(userId, Number(data.tournamentId))
+        // const userIds = await this.playoffsService.updateBracketFromSubmit(userId, Number(data.tournamentId))
 
-        console.log("userIds", userIds)
-        let users: UserDetailDto[] = []
-        if (userIds.length === 2) {
-          for (const userId of userIds) {
-            const user = await this.usersService.getUserById(userId.toString())
-            users.push(user)
-          }
-        }
+        // let users: UserDetailDto[] = []
+        // if (userIds.length === 2) {
+        //   for (const userId of userIds) {
+        //     const user = await this.usersService.getUserById(userId.toString())
+        //     users.push(user)
+        //   }
+        // }
         const smtpConfig: SMTPConfig = {
           host: process.env.SMTP_HOST || 'localhost',
           port: parseInt(process.env.SMTP_PORT || '587'),
@@ -243,25 +242,22 @@ export class GamesController {
           user: process.env.SMTP_USER_JUNTA || '',
           password: process.env.SMTP_PWD_JUNTA || '',
         };
-        console.log("smtpConfig", smtpConfig)
+        // console.log("smtpConfig", smtpConfig)
 
-        const playerOne = `${users[0].first_name} ${users[0].last_name} (Playdek: ${users[0].playdek_name}) - Timezone: ${users[0].timezone_id}`
-        const playerTwo = `${users[1].first_name} ${users[1].last_name} (Playdek: ${users[1].playdek_name}) - Timezone: ${users[1].timezone_id}`
+        // const playerOne = `${users[0].first_name} ${users[0].last_name} (Playdek: ${users[0].playdek_name}) - Timezone: ${users[0].timezone_id}`
+        // const playerTwo = `${users[1].first_name} ${users[1].last_name} (Playdek: ${users[1].playdek_name}) - Timezone: ${users[1].timezone_id}`
 
-        this.scheduleService.addSchedulePlayers(
-          users[0].id,
-          users[1].id,
-          Number(data.tournamentId),
-          new Date(),
-          'J002'
-        )
+        // this.scheduleService.addSchedulePlayers(
+        //   users[0].id,
+        //   users[1].id,
+        //   Number(data.tournamentId),
+        //   new Date(),
+        //   'J002'
+        // )
 
-        const emailSent = await this.emailService.sendPlayoffsEmail(
+        const emailSent = await this.emailService.sendPlayoffsEmailAdminNotification(
           ['juli.arnalot@gmail.com'],
-          'Twilight Struggle Playoffs',
-          '12-12-2026',
-          playerOne,
-          playerTwo,
+          winnerId,
           smtpConfig
         );
         console.log("email sent")
@@ -320,7 +316,7 @@ export class GamesController {
         });
 
         // if tournament is ITSL main playoff
-        if (data.tournamentId === "325") {
+        if (["325","326"].includes(data.tournamentId)) {
           this.updateITSLPlayoffBracket(data)
         }
       }

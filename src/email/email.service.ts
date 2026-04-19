@@ -20,6 +20,10 @@ export interface SMTPConfig {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
+  private readonly playoffsBodyEmailAdminNotification = (winnerId: bigint) => `
+    A playoffs round has been updated. The winner is ${winnerId}.
+    Take a look and create the next round!!!
+  `
   private readonly playoffsBodyEmail = (tournamentName: string, dueDate: string, playerOne: string, playerTwo: string) => `
 <p>Dear players,</p>
 
@@ -65,6 +69,17 @@ Remember that you can find the complete schedule here:<br>
 
 <p><strong>ITS Junta</strong></p>
 `
+
+  async sendPlayoffsEmailAdminNotification(destEmails: string[], winnerId: bigint, smtpConfig: SMTPConfig) {
+    const email: EmailOptions = {
+      subject: 'ITSL - Playoffs update',
+      text: "",
+      html: this.playoffsBodyEmailAdminNotification(winnerId),
+      to: destEmails
+    }
+
+    this.sendEmail(email, smtpConfig)
+  }
 
   async sendPlayoffsEmail(destEmails: string[], tournamentName: string, dueDate: string, namePlayerOne: string, namePlayerTwo: string, smtpConfig: SMTPConfig) {
     const email: EmailOptions = {
