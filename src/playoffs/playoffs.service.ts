@@ -6,6 +6,8 @@ import {
   PlayoffEntryDto,
   PlayoffSummaryDto,
   UpdatePlayoffBracketResultDto,
+  UpdatePlayoffWinnerDto,
+  UpdatePlayoffWinnerResultDto,
 } from './dto/playoffs.dto';
 import { find } from 'rxjs';
 
@@ -183,6 +185,7 @@ export class PlayoffsService {
       nextSquare: entry.nextSquare || '',
       userName: entry.users ? `${entry.users.first_name} ${entry.users.last_name}`.trim() : undefined,
       countryCode: entry.users?.countries?.tld_code || undefined,
+      winnerUserId: Boolean((entry as any).winnerUserId),
     }));
   }
 
@@ -245,6 +248,36 @@ export class PlayoffsService {
       success: true,
       message: 'Playoff bracket updated successfully',
       updatedEntries: updatedCount,
+    };
+  }
+
+  /**
+   * Updates the winnerUserId field for a playoff bracket entry.
+   */
+  async updatePlayoffWinner(
+    data: UpdatePlayoffWinnerDto,
+  ): Promise<UpdatePlayoffWinnerResultDto> {
+    if (!data.id) {
+      throw new HttpException(
+        'Bracket id is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const existing = await this.databaseService.playoff_bracket.findUnique({
+      where: { id: Number(data.id) },
+    });
+
+    await this.databaseService.playoff_bracket.update({
+      where: { id: Number(data.id) },
+      data: {
+        winnerUserId: !Boolean((existing as any)?.winnerUserId),
+      } as any,
+    });
+
+    return {
+      success: true,
+      message: 'Playoff winner updated successfully',
     };
   }
 }

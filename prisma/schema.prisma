@@ -293,6 +293,7 @@ model playoff_bracket {
   id            Int          @id @default(autoincrement())
   seed          Int?
   best_of_games Int?
+  winnerUserId  Boolean      @default(dbgenerated("b'0'")) @db.Bit(1)
   tournaments   tournaments? @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_tournament")
   users         users?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_user")
 

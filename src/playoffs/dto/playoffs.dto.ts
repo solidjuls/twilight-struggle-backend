@@ -16,6 +16,7 @@ export interface PlayoffBracketResponseDto {
   nextSquare: string;
   userName?: string;
   countryCode?: string;
+  winnerUserId: boolean;
 }
 
 export interface CreatePlayoffBracketResultDto {
@@ -50,4 +51,14 @@ export interface UpdatePlayoffBracketResultDto {
   success: boolean;
   message: string;
   updatedEntries: number;
+}
+
+export interface UpdatePlayoffWinnerDto {
+  id: number;
+  winnerUserId: boolean;
+}
+
+export interface UpdatePlayoffWinnerResultDto {
+  success: boolean;
+  message: string;
 }

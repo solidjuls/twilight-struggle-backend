@@ -21,6 +21,8 @@ import {
   CreatePlayoffScheduleDto,
   CreatePlayoffScheduleResultDto,
   UpdatePlayoffBracketResultDto,
+  UpdatePlayoffWinnerDto,
+  UpdatePlayoffWinnerResultDto,
 } from './dto/playoffs.dto';
 
 @Controller('playoffs')
@@ -78,6 +80,28 @@ export class PlayoffsController {
         throw error;
       }
       console.error('[Playoffs PUT]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * PUT /api/playoffs/winner
+   * Updates the winnerUserId field for a playoff bracket entry.
+   */
+  @Put('winner')
+  async updatePlayoffWinner(
+    @Body() body: UpdatePlayoffWinnerDto,
+  ): Promise<UpdatePlayoffWinnerResultDto> {
+    try {
+      return await this.playoffsService.updatePlayoffWinner(body);
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      console.error('[Playoffs PUT Winner]', error);
       throw new HttpException(
         'Internal Server Error',
         HttpStatus.INTERNAL_SERVER_ERROR,
