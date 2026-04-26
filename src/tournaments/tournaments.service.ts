@@ -8,16 +8,6 @@ export class TournamentsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async getTournamentsByStatus(statusArray: string[]): Promise<TournamentDto[]> {
-    const filter = statusArray.length > 0
-      ? {
-          where: {
-            status_id: {
-              in: statusArray.map(Number)
-            }
-          },
-        }
-      : undefined;
-
     const tournaments = await this.databaseService.tournaments.findMany({
       select: {
         id: true,
@@ -28,6 +18,7 @@ export class TournamentsService {
         description: true,
         created_at: true,
         updated_at: true,
+        parent_id: true,
         tournament_admins: {
           select: {
             users: {
@@ -40,7 +31,14 @@ export class TournamentsService {
           }
         }
       },
-      ...filter,
+      where: {
+        parent_id: null,
+        ...(statusArray.length > 0 && {
+          status_id: {
+            in: statusArray.map(Number)
+          }
+        })
+      },
       orderBy: {
         created_at: "desc",
       },
