@@ -24,6 +24,7 @@ import {
   UpdatePlayoffWinnerDto,
   UpdatePlayoffWinnerResultDto,
 } from './dto/playoffs.dto';
+import { Public } from 'src/auth/decorators/auth.decorators';
 
 @Controller('playoffs')
 export class PlayoffsController {
@@ -36,6 +37,7 @@ export class PlayoffsController {
   ) {}
 
   @Get('health')
+  @Public()
   getHealth(): { status: string; timestamp: string } {
     return {
       status: 'Playoffs API is healthy',
@@ -114,6 +116,7 @@ export class PlayoffsController {
    * Returns all playoffs names and IDs.
    */
   @Get('getAll')
+  @Public()
   async getAllPlayoffs(): Promise<PlayoffSummaryDto[]> {
     try {
       return await this.playoffsService.getAllPlayoffs();
@@ -131,6 +134,7 @@ export class PlayoffsController {
    * Returns the playoff bracket for a tournament.
    */
   @Get(':tournamentId')
+  @Public()
   async getPlayoffBracket(
     @Param('tournamentId') tournamentId: string,
   ): Promise<PlayoffBracketResponseDto[]> {
