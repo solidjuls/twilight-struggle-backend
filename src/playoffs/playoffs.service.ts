@@ -224,23 +224,28 @@ export class PlayoffsService {
     let updatedCount = 0;
 
     for (const entry of data) {
-      if (!entry.id) {
-        throw new HttpException(
-          'Each bracket entry must have an id for update',
-          HttpStatus.BAD_REQUEST,
-        );
+      if (entry.id) {
+        await this.databaseService.playoff_bracket.update({
+          where: { id: Number(entry.id) },
+          data: {
+            tournament_id: entry.tournamentId,
+            userId: entry.userId ? BigInt(entry.userId) : null,
+            seed: entry.seed ?? null,
+            playoffSquare: entry.playoffSquare,
+            nextSquare: entry.nextSquare,
+          },
+        });
+      } else {
+        await this.databaseService.playoff_bracket.create({
+          data: {
+            tournament_id: entry.tournamentId,
+            userId: entry.userId ? BigInt(entry.userId) : null,
+            seed: entry.seed ?? null,
+            playoffSquare: entry.playoffSquare,
+            nextSquare: entry.nextSquare,
+          },
+        });
       }
-
-      await this.databaseService.playoff_bracket.update({
-        where: { id: Number(entry.id) },
-        data: {
-          tournament_id: entry.tournamentId,
-          userId: entry.userId ? BigInt(entry.userId) : null,
-          seed: entry.seed ?? null,
-          playoffSquare: entry.playoffSquare,
-          nextSquare: entry.nextSquare,
-        },
-      });
       updatedCount++;
     }
 

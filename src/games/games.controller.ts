@@ -316,7 +316,7 @@ export class GamesController {
         });
 
         // if tournament is ITSL main playoff
-        if (["325","326"].includes(data.tournamentId)) {
+        if (["327","326"].includes(data.tournamentId)) {
           this.updateITSLPlayoffBracket(data)
         }
       }
