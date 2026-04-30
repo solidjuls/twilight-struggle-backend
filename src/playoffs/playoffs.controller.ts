@@ -164,12 +164,12 @@ export class PlayoffsController {
     @Body() body: CreatePlayoffScheduleDto,
   ): Promise<CreatePlayoffScheduleResultDto> {
     try {
-      const { usaPlayerId, ussrPlayerId, tournamentId, randomSides, dueDateDays = 15 } = body;
+      const { usaPlayerId, ussrPlayerId, tournamentId, randomSides, due_date } = body;
 
       // Validate required fields
-      if (!usaPlayerId || !ussrPlayerId || !tournamentId) {
+      if (!usaPlayerId || !ussrPlayerId || !tournamentId || !due_date) {
         throw new HttpException(
-          'Missing required fields: usaPlayerId, ussrPlayerId, tournamentId, dueDateDays',
+          'Missing required fields: usaPlayerId, ussrPlayerId, tournamentId, due_date',
           HttpStatus.BAD_REQUEST,
         );
       }
@@ -187,9 +187,8 @@ export class PlayoffsController {
         );
       }
 
-      // Calculate due date
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + dueDateDays);
+      // Format due date
+      const dueDate = new Date(due_date);
       const dueDateFormatted = dueDate.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',

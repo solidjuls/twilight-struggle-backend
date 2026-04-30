@@ -34,11 +34,11 @@ export interface PlayoffSummaryDto {
 export interface CreatePlayoffScheduleDto {
   usaPlayerId: string;
   ussrPlayerId: string;
-  randomSides: boolean
+  randomSides: boolean;
   tournamentId: number;
   tournamentName: string;
   gameCode: string;
-  dueDateDays: number; // days to add to current date
+  due_date: Date;
 }
 
 export interface CreatePlayoffScheduleResultDto {
