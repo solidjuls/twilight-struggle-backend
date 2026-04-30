@@ -105,6 +105,25 @@ export class TournamentsService {
     }));
   }
 
+  async getChildTournaments(parentIds: number[]): Promise<{ id: number }[]> {
+    if (!parentIds || parentIds.length === 0) {
+      return [];
+    }
+
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: {
+        parent_id: {
+          in: parentIds,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return childTournaments;
+  }
+
   async getRegisteredPlayers(
     tournamentId: number,
     userRole?: number,
@@ -337,7 +356,7 @@ export class TournamentsService {
   }
 
   async getUserAdminTournaments(userId: string): Promise<TournamentDto[]> {
-    // Get tournaments where user is admin
+    // Get tournaments where user is directly admin
     const adminTournaments = await this.databaseService.tournament_admins.findMany({
       where: {
         userId: BigInt(userId),
@@ -366,8 +385,36 @@ export class TournamentsService {
       },
     });
 
-    // Map to tournament DTOs
-    return adminTournaments.map(adminTournament => {
+    // Get IDs of tournaments where user is admin
+    const adminTournamentIds = adminTournaments.map(at => at.tournaments.id);
+
+    // Get child tournaments where parent_id is a tournament the user is admin of
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: {
+        parent_id: {
+          in: adminTournamentIds,
+        },
+        status_id: {
+          in: [1, 2, 3, 4],
+        },
+      },
+      include: {
+        tournament_admins: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Map direct admin tournaments to DTOs
+    const directAdminDtos = adminTournaments.map(adminTournament => {
       const tournament = adminTournament.tournaments;
       return {
         id: tournament.id.toString(),
@@ -384,6 +431,30 @@ export class TournamentsService {
         ),
       };
     });
+
+    // Map child tournaments to DTOs
+    const childDtos = childTournaments.map(tournament => ({
+      id: tournament.id.toString(),
+      tournament_name: tournament.tournament_name,
+      status_id: tournament.status_id,
+      waitlist: tournament.waitlist,
+      starting_date: tournament.starting_date,
+      description: tournament.description,
+      created_at: tournament.created_at,
+      updated_at: tournament.updated_at,
+      adminId: tournament.tournament_admins.map(admin => admin.users.id.toString()),
+      adminName: tournament.tournament_admins.map(admin =>
+        `${admin.users.first_name} ${admin.users.last_name}`
+      ),
+    }));
+
+    // Combine and deduplicate by id
+    const allTournaments = [...directAdminDtos, ...childDtos];
+    const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
+      index === self.findIndex(t => t.id === tournament.id)
+    );
+
+    return uniqueTournaments;
   }
 
   async getUserAvailableTournamentsWithSchedule(userId: string): Promise<{

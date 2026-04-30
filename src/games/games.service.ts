@@ -354,7 +354,7 @@ export class GamesService {
   async recreateGame(data: RecreateGameDto, userRole: number, userEmail: string): Promise<any> {
     if (!data.oldId) {
       // If no oldId, treat as new game submission
-      return this.submitGame({
+      const result = await this.submitGame({
         gameWinner: data.gameWinner,
         gameCode: data.gameCode,
         tournamentId: data.tournamentId,
@@ -364,6 +364,7 @@ export class GamesService {
         endMode: data.endMode,
         video1: data.video1,
       });
+      return result;
     } else {
       if (data.op === 'delete') {
         return this.deleteGameRecreateRatings(data, userRole, userEmail);

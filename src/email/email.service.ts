@@ -29,9 +29,9 @@ export class EmailService {
 
 <p>Your next ${tournamentName} game is ready!</p>
 
-<p>Just a friendly reminder that the due date for this Game is ${dueDate}</p>
+<p>The due date for this Game is ${dueDate}</p>
 
-<p><strong>Below is the information for your game:</strong></p>
+<p>If the game you have to play is random, the higher seed player has to choose the side:</p>
 
 <p>
 Due Date: ${dueDate}<br>

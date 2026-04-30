@@ -79,14 +79,21 @@ export class ScheduleController {
       let parsedTournamentIds: string[] | undefined;
 
       if (tournamentId) {
-        parsedTournamentIds = tournamentId.split(',');
+        const requestedIds = tournamentId.split(',');
+        // Get child tournaments (those with parent_id matching the requested tournament IDs)
+        const childTournaments = await this.tournamentsService.getChildTournaments(requestedIds.map(Number));
+        const childIds = childTournaments.map(t => t.id.toString());
+        parsedTournamentIds = [...requestedIds, ...childIds];
       } else if (ongoingUserTournaments.length > 0) {
         const ongoingTournaments = ongoingUserTournaments.filter(t => t.status_id === 4);
         const defaultTournament = ongoingTournaments.length > 0
           ? ongoingTournaments[0]
           : ongoingUserTournaments[0];
 
-        parsedTournamentIds = [defaultTournament.id];
+        // Get child tournaments for the default tournament
+        const childTournaments = await this.tournamentsService.getChildTournaments([Number(defaultTournament.id)]);
+        const childIds = childTournaments.map(t => t.id.toString());
+        parsedTournamentIds = [defaultTournament.id, ...childIds];
       } else {
         return {
           results: [],
@@ -196,14 +203,15 @@ export class ScheduleController {
   @Put()
   async addSchedule(@Body() body: { data: CreateScheduleDto }) {
     try {
-      const { usa, ussr, t, d, gc } = body.data;
-      
+      const { usa, ussr, t, d, gc, randomSides } = body.data;
+
       const updated = await this.scheduleService.addSchedulePlayers(
         usa,
         ussr,
         Number(t),
         new Date(d),
         gc,
+        randomSides,
       );
 
       return updated;

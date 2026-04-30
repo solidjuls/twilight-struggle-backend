@@ -40,6 +40,7 @@ export interface CreateScheduleDto {
   t: number; // tournament ID
   d: Date; // due date
   gc: string; // game code
+  randomSides?: boolean; // random sides
 }
 
 export interface CsvScheduleRow {

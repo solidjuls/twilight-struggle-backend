@@ -255,7 +255,8 @@ export class ScheduleService {
     ussr: string,
     t: number,
     d: Date,
-    gc: string
+    gc: string,
+    randomSides?: boolean
   ): Promise<ScheduleUpdateResult> {
     const schedule = await this.databaseService.schedule.create({
       data: {
@@ -264,6 +265,7 @@ export class ScheduleService {
         usa_player_id: BigInt(usa),
         ussr_player_id: BigInt(ussr),
         due_date: d,
+        random_sides: randomSides,
       }
     });
     return {

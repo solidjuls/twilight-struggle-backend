@@ -61,6 +61,7 @@ export interface RecreateGameDto {
   endTurn: string;
   endMode: string;
   video1?: string;
+  scheduleId?: string;
 }
 
 export interface SubmitGameRequestDto {

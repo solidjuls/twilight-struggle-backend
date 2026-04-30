@@ -210,12 +210,12 @@ export class GamesController {
     return winnerId;
   }
 
-  async updateITSLPlayoffBracket(data: SubmitGameDto) {
+  async updateITSLPlayoffBracket(data: SubmitGameDto, due_date: Date) {
     const userId = data.gameWinner === "1" ? BigInt(data.usaPlayerId) : BigInt(data.ussrPlayerId)
     const tId = data.tournamentId
 
     // Check best_of_games
-    const BO = await this.playoffsService.getBOFromPlayoff(userId, tId)
+    const BO = 3// await this.playoffsService.getBOFromPlayoff(userId, tId)
 
     if (BO > 1) {
       // Select on game_results games by tId and the 2 players
@@ -267,7 +267,7 @@ export class GamesController {
           data.ussrPlayerId,
           data.usaPlayerId,
           Number(data.tournamentId),
-          new Date(),
+          due_date,
           'J002'
         )
       }
@@ -282,8 +282,8 @@ export class GamesController {
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
       const data = submitGameRequest.data;
-
-      if (submitGameRequest.data.scheduleId) {
+      const tournamentHardcoded = (["325", "326", "327", "328", "318"].includes(data.tournamentId))
+      if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
         // Validate schedule integrity before submission
         const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
           usaPlayerId: Number(data.usaPlayerId),
@@ -310,14 +310,14 @@ export class GamesController {
       const result = await this.gamesService.submitGame(submitGameRequest.data);
 
       if (result && submitGameRequest.data.scheduleId) {
-        await this.scheduleService.updateSchedule({
+        const updatedSchedule = await this.scheduleService.updateSchedule({
           gameResultId: result.id,
           scheduleId: Number(submitGameRequest.data.scheduleId),
         });
 
         // if tournament is ITSL main playoff
         if (["327","326"].includes(data.tournamentId)) {
-          this.updateITSLPlayoffBracket(data)
+          this.updateITSLPlayoffBracket(data, updatedSchedule.due_date)
         }
       }
       return result;
@@ -335,7 +335,16 @@ export class GamesController {
   async recreateGame(@Body() body: { data: RecreateGameDto }, @Req() req: any) {
     try {
       const user = req.user;
-      const result = await this.gamesService.recreateGame(body.data, user.role, user.mail);
+      const data = body.data;
+      const result = await this.gamesService.recreateGame(data, user.role, user.mail);
+
+      // If scheduleId is provided, update the schedule with the game result
+      if (result && data.scheduleId) {
+        await this.scheduleService.updateSchedule({
+          gameResultId: result.id,
+          scheduleId: Number(data.scheduleId),
+        });
+      }
 
       // Convert BigInt to string for JSON serialization
       const resultParsed = JSON.stringify(result, (_key, value) =>

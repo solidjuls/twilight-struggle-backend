@@ -164,7 +164,7 @@ export class PlayoffsController {
     @Body() body: CreatePlayoffScheduleDto,
   ): Promise<CreatePlayoffScheduleResultDto> {
     try {
-      const { usaPlayerId, ussrPlayerId, tournamentId, dueDateDays = 15 } = body;
+      const { usaPlayerId, ussrPlayerId, tournamentId, randomSides, dueDateDays = 15 } = body;
 
       // Validate required fields
       if (!usaPlayerId || !ussrPlayerId || !tournamentId) {
@@ -203,6 +203,7 @@ export class PlayoffsController {
         tournamentId,
         dueDate,
         gameCode,
+        randomSides
       );
       const tournament = await this.tournamentService.getTournamentsById([tournamentId.toString()])
 
