@@ -8,16 +8,6 @@ export class TournamentsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async getTournamentsByStatus(statusArray: string[]): Promise<TournamentDto[]> {
-    const filter = statusArray.length > 0
-      ? {
-          where: {
-            status_id: {
-              in: statusArray.map(Number)
-            }
-          },
-        }
-      : undefined;
-
     const tournaments = await this.databaseService.tournaments.findMany({
       select: {
         id: true,
@@ -28,6 +18,7 @@ export class TournamentsService {
         description: true,
         created_at: true,
         updated_at: true,
+        parent_id: true,
         tournament_admins: {
           select: {
             users: {
@@ -40,7 +31,14 @@ export class TournamentsService {
           }
         }
       },
-      ...filter,
+      where: {
+        parent_id: null,
+        ...(statusArray.length > 0 && {
+          status_id: {
+            in: statusArray.map(Number)
+          }
+        })
+      },
       orderBy: {
         created_at: "desc",
       },
@@ -105,6 +103,25 @@ export class TournamentsService {
       adminId: item.tournament_admins?.map(admin => admin.users.id.toString()) || [],
       adminName: item.tournament_admins?.map(admin => `${admin.users.first_name} ${admin.users.last_name}`) || []
     }));
+  }
+
+  async getChildTournaments(parentIds: number[]): Promise<{ id: number }[]> {
+    if (!parentIds || parentIds.length === 0) {
+      return [];
+    }
+
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: {
+        parent_id: {
+          in: parentIds,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    return childTournaments;
   }
 
   async getRegisteredPlayers(
@@ -194,6 +211,7 @@ export class TournamentsService {
         waitlist: waitlist || false,
         starting_date: startingDate || null,
         description: description || null,
+        type: 'league',
       },
     });
 
@@ -214,6 +232,41 @@ export class TournamentsService {
     }
 
     return newTournament;
+  }
+
+  async createSubtournament(
+    parentId: number,
+    subtournamentData: {
+      tournamentName: string;
+      description?: string;
+      startingDate?: Date;
+    },
+  ): Promise<any> {
+    const { tournamentName, description, startingDate } = subtournamentData;
+
+    // Verify parent tournament exists
+    const parentTournament = await this.databaseService.tournaments.findUnique({
+      where: { id: parentId },
+    });
+
+    if (!parentTournament) {
+      throw new Error('Parent tournament not found');
+    }
+
+    // Create the subtournament with type 'playoff' and link to parent
+    const subtournament = await this.databaseService.tournaments.create({
+      data: {
+        tournament_name: tournamentName,
+        status_id: 1, // Default status
+        parent_id: parentId,
+        type: 'playoff',
+        description: description || null,
+        starting_date: startingDate || null,
+        waitlist: false,
+      },
+    });
+
+    return subtournament;
   }
 
   async updateTournament(id: number, status: number): Promise<any> {
@@ -303,7 +356,7 @@ export class TournamentsService {
   }
 
   async getUserAdminTournaments(userId: string): Promise<TournamentDto[]> {
-    // Get tournaments where user is admin
+    // Get tournaments where user is directly admin
     const adminTournaments = await this.databaseService.tournament_admins.findMany({
       where: {
         userId: BigInt(userId),
@@ -332,8 +385,36 @@ export class TournamentsService {
       },
     });
 
-    // Map to tournament DTOs
-    return adminTournaments.map(adminTournament => {
+    // Get IDs of tournaments where user is admin
+    const adminTournamentIds = adminTournaments.map(at => at.tournaments.id);
+
+    // Get child tournaments where parent_id is a tournament the user is admin of
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: {
+        parent_id: {
+          in: adminTournamentIds,
+        },
+        status_id: {
+          in: [1, 2, 3, 4],
+        },
+      },
+      include: {
+        tournament_admins: {
+          include: {
+            users: {
+              select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Map direct admin tournaments to DTOs
+    const directAdminDtos = adminTournaments.map(adminTournament => {
       const tournament = adminTournament.tournaments;
       return {
         id: tournament.id.toString(),
@@ -350,6 +431,30 @@ export class TournamentsService {
         ),
       };
     });
+
+    // Map child tournaments to DTOs
+    const childDtos = childTournaments.map(tournament => ({
+      id: tournament.id.toString(),
+      tournament_name: tournament.tournament_name,
+      status_id: tournament.status_id,
+      waitlist: tournament.waitlist,
+      starting_date: tournament.starting_date,
+      description: tournament.description,
+      created_at: tournament.created_at,
+      updated_at: tournament.updated_at,
+      adminId: tournament.tournament_admins.map(admin => admin.users.id.toString()),
+      adminName: tournament.tournament_admins.map(admin =>
+        `${admin.users.first_name} ${admin.users.last_name}`
+      ),
+    }));
+
+    // Combine and deduplicate by id
+    const allTournaments = [...directAdminDtos, ...childDtos];
+    const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
+      index === self.findIndex(t => t.id === tournament.id)
+    );
+
+    return uniqueTournaments;
   }
 
   async getUserAvailableTournamentsWithSchedule(userId: string): Promise<{

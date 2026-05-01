@@ -115,6 +115,7 @@ export class ScheduleService {
         id: true,
         game_results_id: true,
         due_date: true,
+        random_sides: true,
         tournaments: {
           select: {
             tournament_name: true,
@@ -157,6 +158,7 @@ export class ScheduleService {
       gameDate: result.game_results?.game_date?.toISOString() || null,
       dueDate: result.due_date.toISOString(),
       gameCode: result.game_code,
+      randomSides: result.random_sides,
       id: result.id.toString(),
       gameResultsId: result.game_results_id?.toString() || null,
       nameUsa: `${result.users_schedule_usa_player_idTousers?.first_name || ''} ${result.users_schedule_usa_player_idTousers?.last_name || ''}`,
@@ -236,12 +238,25 @@ export class ScheduleService {
     };
   }
 
+  generateCode(length: number = 4): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+
+    for (let i = 0; i < length; i++) {
+      const randomIndex = Math.floor(Math.random() * chars.length);
+      result += chars[randomIndex];
+    }
+
+    return result.toUpperCase();
+  }
+
   async addSchedulePlayers(
     usa: string,
     ussr: string,
     t: number,
     d: Date,
-    gc: string
+    gc: string,
+    randomSides?: boolean
   ): Promise<ScheduleUpdateResult> {
     const schedule = await this.databaseService.schedule.create({
       data: {
@@ -250,6 +265,7 @@ export class ScheduleService {
         usa_player_id: BigInt(usa),
         ussr_player_id: BigInt(ussr),
         due_date: d,
+        random_sides: randomSides,
       }
     });
     return {

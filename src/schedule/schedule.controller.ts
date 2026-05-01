@@ -63,7 +63,11 @@ export class ScheduleController {
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
-    
+      const allTournaments = [...ongoingUserTournaments, ...userAdminTournaments]
+      const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
+        index === self.findIndex(t => t.id === tournament.id)
+      );
+
       // Parse parameters
       const parsedUserId = finalUserId ? Number(finalUserId) : undefined;
       const parsedPage = Number(finalPage);
@@ -75,45 +79,48 @@ export class ScheduleController {
       let parsedTournamentIds: string[] | undefined;
 
       if (tournamentId) {
-        // Use provided tournament ID(s)
-        parsedTournamentIds = tournamentId.split(',');
+        const requestedIds = tournamentId.split(',');
+        // Get child tournaments (those with parent_id matching the requested tournament IDs)
+        const childTournaments = await this.tournamentsService.getChildTournaments(requestedIds.map(Number));
+        const childIds = childTournaments.map(t => t.id.toString());
+        parsedTournamentIds = [...requestedIds, ...childIds];
       } else if (ongoingUserTournaments.length > 0) {
-        // No tournament provided, select default from user tournaments
-        // Prioritize ongoing tournaments (status_id = 4), then any other tournament
         const ongoingTournaments = ongoingUserTournaments.filter(t => t.status_id === 4);
         const defaultTournament = ongoingTournaments.length > 0
           ? ongoingTournaments[0]
           : ongoingUserTournaments[0];
 
-        parsedTournamentIds = [defaultTournament.id];
+        // Get child tournaments for the default tournament
+        const childTournaments = await this.tournamentsService.getChildTournaments([Number(defaultTournament.id)]);
+        const childIds = childTournaments.map(t => t.id.toString());
+        parsedTournamentIds = [defaultTournament.id, ...childIds];
       } else {
-        // User has no tournaments - return empty results
         return {
           results: [],
           totalRows: 0,
           currentPage: parsedPage,
           totalPages: 0,
-          userTournaments: ongoingUserTournaments,
+          userTournaments: uniqueTournaments,
           defaultTournament: '',
         };
       }
+      // // validate tournament is open for non-admin view
+      // if (finalUserId) {
+      //   const openTournament = ongoingUserTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
+      //   console.log("parsedTournamentIds1", parsedTournamentIds, adminView, finalUserId, openTournament);
+      //   if (openTournament.length === 0) { 
+      //     return {
+      //       results: [],
+      //       totalRows: 0,
+      //       currentPage: parsedPage,
+      //       totalPages: 0,
+      //       userTournaments: uniqueTournaments,
+      //       defaultTournament: parsedTournamentIds[0],
+      //     };
+      //   }
+      // }
 
-      // validate tournament is open for non-admin view
-      if (finalUserId) {
-        const openTournament = ongoingUserTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
-        if (openTournament.length === 0) {
-          return {
-            results: [],
-            totalRows: 0,
-            currentPage: parsedPage,
-            totalPages: 0,
-            userTournaments: ongoingUserTournaments,
-            defaultTournament: parsedTournamentIds[0],
-          };
-        }
-      }
-
-            // Find if user is admin of tournamentId
+      // Find if user is admin of tournamentId
       const userIsAdmin = userAdminTournaments.some(t => t.id === parsedTournamentIds[0]);
 
       if (userId && !userIsAdmin && userId !== user.id.toString()) {
@@ -127,6 +134,7 @@ export class ScheduleController {
       // Validate orderDirection parameter
       const validOrderDirection = ['asc', 'desc'];
       const finalOrderDirection = validOrderDirection.includes(orderDirection) ? orderDirection : 'asc';
+
       const result = await this.scheduleService.getSchedules({
         userId: parsedUserId,
         tournament: parsedTournamentIds,
@@ -149,7 +157,7 @@ export class ScheduleController {
       });
       return {
         ...result,
-        userTournaments: ongoingUserTournaments,
+        userTournaments: uniqueTournaments,
         defaultTournament: parsedTournamentIds[0],
       };
     } catch (error) {
@@ -195,14 +203,15 @@ export class ScheduleController {
   @Put()
   async addSchedule(@Body() body: { data: CreateScheduleDto }) {
     try {
-      const { usa, ussr, t, d, gc } = body.data;
-      
+      const { usa, ussr, t, d, gc, randomSides } = body.data;
+
       const updated = await this.scheduleService.addSchedulePlayers(
         usa,
         ussr,
         Number(t),
         new Date(d),
         gc,
+        randomSides,
       );
 
       return updated;

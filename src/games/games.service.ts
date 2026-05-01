@@ -20,7 +20,7 @@ export class GamesService {
     private readonly ratingService: RatingService,
   ) {}
 
-  private createPrismaFilter(filter: GameFilterDto): any {
+  private async createPrismaFilter(filter: GameFilterDto): Promise<any> {
     const prismaFilter: any = {};
 
     if (filter.id) {
@@ -51,7 +51,18 @@ export class GamesService {
     }
 
     if (filter.toFilter && filter.toFilter.length > 0) {
-      prismaFilter.tournament_id = { in: filter.toFilter };
+      // Include child tournament IDs (subtournaments) - 1 level only
+      const childTournaments = await this.databaseService.tournaments.findMany({
+        where: {
+          parent_id: { in: filter.toFilter },
+        },
+        select: {
+          id: true,
+        },
+      });
+      const childIds = childTournaments.map(t => t.id);
+      const allTournamentIds = [...filter.toFilter, ...childIds];
+      prismaFilter.tournament_id = { in: allTournamentIds };
     }
 
     if (filter.video === true) {
@@ -115,7 +126,7 @@ export class GamesService {
     pageSize = pageSize || 20;
     const skip = (page - 1) * pageSize;
 
-    const prismaFilter = this.createPrismaFilter(filter);
+    const prismaFilter = await this.createPrismaFilter(filter);
 
     const totalRows = await this.databaseService.game_results.count({
       where: prismaFilter,
@@ -206,6 +217,35 @@ export class GamesService {
       results,
       totalRows,
     };
+  }
+
+  async getGameByUsers(idPlayer1: bigint, idPlayer2: bigint, tId: number) {
+    const games = await this.databaseService.game_results.findMany({
+      select: {
+        id: true,
+        game_winner: true,
+        usa_player_id: true,
+        ussr_player_id: true
+      },
+      where: {
+        tournament_id: tId,
+        OR: [
+          {
+            AND: [
+              { usa_player_id: idPlayer1 },
+              { ussr_player_id: idPlayer2 }
+            ]
+          },
+          {
+            AND: [
+              { usa_player_id: idPlayer2 },
+              { ussr_player_id: idPlayer1 }
+            ]
+          }
+        ]
+      }
+    })
+    return games
   }
 
   async getGameById(id: string) {
@@ -314,7 +354,7 @@ export class GamesService {
   async recreateGame(data: RecreateGameDto, userRole: number, userEmail: string): Promise<any> {
     if (!data.oldId) {
       // If no oldId, treat as new game submission
-      return this.submitGame({
+      const result = await this.submitGame({
         gameWinner: data.gameWinner,
         gameCode: data.gameCode,
         tournamentId: data.tournamentId,
@@ -324,6 +364,7 @@ export class GamesService {
         endMode: data.endMode,
         video1: data.video1,
       });
+      return result;
     } else {
       if (data.op === 'delete') {
         return this.deleteGameRecreateRatings(data, userRole, userEmail);

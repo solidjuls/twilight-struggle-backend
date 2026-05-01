@@ -43,8 +43,8 @@ model game_results {
   reporter_id                              BigInt?           @db.UnsignedBigInt
   usa_previous_rating                      Int               @default(0)
   ussr_previous_rating                     Int               @default(0)
-  users_game_results_reporter_idTousers    users?            @relation("game_results_reporter_idTousers", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_reporter_id_foreign")
   tournaments                              tournaments?      @relation(fields: [tournament_id], references: [id], onDelete: Cascade, map: "fk_game_results_tournament_id_foreign")
+  users_game_results_reporter_idTousers    users?            @relation("game_results_reporter_idTousers", fields: [reporter_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_reporter_id_foreign")
   users_game_results_usa_player_idTousers  users             @relation("game_results_usa_player_idTousers", fields: [usa_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_usa_player_id_foreign")
   users_game_results_ussr_player_idTousers users             @relation("game_results_ussr_player_idTousers", fields: [ussr_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "game_results_ussr_player_id_foreign")
   ratings_history                          ratings_history[]
@@ -132,6 +132,7 @@ model users {
   hall_of_fame_hall_of_fame_winner_idTousers      hall_of_fame[]            @relation("hall_of_fame_winner_idTousers")
   hall_of_fame_hall_of_fame_second_idTousers      hall_of_fame[]            @relation("hall_of_fame_second_idTousers")
   hall_of_fame_hall_of_fame_third_idTousers       hall_of_fame[]            @relation("hall_of_fame_third_idTousers")
+  playoff_bracket                                 playoff_bracket[]
   ratings_history                                 ratings_history[]
   schedule_schedule_usa_player_idTousers          schedule[]                @relation("schedule_usa_player_idTousers")
   schedule_schedule_ussr_player_idTousers         schedule[]                @relation("schedule_ussr_player_idTousers")
@@ -195,14 +196,20 @@ model tournaments {
   description             String?                   @db.Text
   starting_date           DateTime?                 @db.Date
   waitlist                Boolean?
+  type                    tournaments_type
+  parent_id               Int?
   game_results            game_results[]
+  playoff_bracket         playoff_bracket[]
   schedule                schedule[]
   tournament_admins       tournament_admins[]
   tournament_registration tournament_registration[]
   tournament_waitlist     tournament_waitlist[]
   TournamentStatus        TournamentStatus          @relation(fields: [status_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "tournaments_TournamentStatus_FK")
+  parent                  tournaments?              @relation("SubTournaments", fields: [parent_id], references: [id], onUpdate: NoAction)
+  children                tournaments[]             @relation("SubTournaments")
 
   @@index([status_id], map: "tournaments_TournamentStatus_FK")
+  @@index([parent_id], map: "tournaments_parent_id_FK")
 }
 
 model schedule {
@@ -215,6 +222,7 @@ model schedule {
   game_results_id                      BigInt?       @db.UnsignedBigInt
   created_at                           DateTime?     @default(now()) @db.Timestamp(0)
   updated_at                           DateTime?     @default(now()) @db.Timestamp(0)
+  random_sides                         Boolean?      @default(dbgenerated("b'0'")) @db.Bit(1)
   tournaments                          tournaments   @relation(fields: [tournaments_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_1")
   users_schedule_usa_player_idTousers  users?        @relation("schedule_usa_player_idTousers", fields: [usa_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_2")
   users_schedule_ussr_player_idTousers users?        @relation("schedule_ussr_player_idTousers", fields: [ussr_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_3")
@@ -243,7 +251,7 @@ model standing_players {
   users       users     @relation(fields: [user_id], references: [id], onDelete: Cascade, map: "fk_standing_players_user_id_foreign")
 
   @@id([standing_id, user_id])
-  @@index([user_id], map: "standing_players_user_id_foreign")
+  @@index([user_id], map: "fk_standing_players_user_id_foreign")
 }
 
 model standings {
@@ -277,6 +285,22 @@ model hall_of_fame {
   @@index([winner_id], map: "winner_id")
 }
 
+model playoff_bracket {
+  userId        BigInt?      @db.UnsignedBigInt
+  playoffSquare String       @db.VarChar(100)
+  nextSquare    String?      @db.VarChar(100)
+  tournament_id Int?
+  id            Int          @id @default(autoincrement())
+  seed          Int?
+  best_of_games Int?
+  winnerUserId  Boolean      @default(dbgenerated("b'0'")) @db.Bit(1)
+  tournaments   tournaments? @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_tournament")
+  users         users?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_user")
+
+  @@index([tournament_id], map: "fk_playoff_tournament")
+  @@index([userId], map: "fk_playoff_user")
+}
+
 enum tournament_registration_status {
   accepted
   rejected
@@ -289,4 +313,9 @@ enum tournament_waitlist_status {
   waiting
   accepted
   canceled
+}
+
+enum tournaments_type {
+  playoff
+  league
 }

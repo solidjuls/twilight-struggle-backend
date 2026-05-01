@@ -20,15 +20,25 @@ import {
   SubmitGameRequestDto,
   RecreateGameDto,
   GetGameChartQueryDto,
+  SubmitGameDto,
+  SeedType,
 } from './dto/game.dto';
 import { ScheduleService } from 'src/schedule/schedule.service';
+import { PlayoffsService } from 'src/playoffs/playoffs.service';
+import { EmailService, SMTPConfig } from 'src/email/email.service';
+import { UsersService } from 'src/users/users.service';
+import { UserDetailDto } from 'src/users/dto/users.dto';
 
 @Controller('games')
 @UseGuards(JwtAuthGuard)
 export class GamesController {
   constructor(
     private readonly gamesService: GamesService,
-    private readonly scheduleService: ScheduleService
+    private readonly scheduleService: ScheduleService,
+    private readonly playoffsService: PlayoffsService,
+    private readonly emailService: EmailService,
+    private readonly usersService: UsersService
+
   ) {}
 
   @Get()
@@ -172,14 +182,114 @@ export class GamesController {
     }
   }
 
+  
+  getSeriesWinner(games: {
+    id: bigint;
+    usa_player_id: bigint;
+    ussr_player_id: bigint;
+    game_winner: string;
+}[], bestOf: number, player1Seed: SeedType, player2Seed: SeedType): bigint | null {
+    if (games.length === 0) return null;
 
+    const countWins = new Map<number, number>();
+    let tieCase = false
+    for (const game of games) {
+      if (game.game_winner === "1") {
+        const usaId = Number(game.usa_player_id)
+        countWins.set(usaId, (countWins.get(usaId) || 0) + 1)
+      }
+      if (game.game_winner === "2") {
+        const ussrId = Number(game.ussr_player_id)
+        countWins.set(ussrId, (countWins.get(ussrId) || 0) + 1)
+      }
+      if (game.game_winner === "3") {
+        tieCase = true
+      }
+    }
+
+    const neededToWin = Math.ceil(bestOf / 2);
+    let winnerId = null
+    for (const [key, value] of countWins) {
+      if (value === neededToWin) winnerId = key;
+    }
+
+    // if there is a tie, there's a winner if the higher seed has won 1 game
+    if (tieCase && games.length === 2 && !winnerId) {
+      console.log("special tie case!", countWins, countWins.entries.length)
+      if (countWins.size > 0) {
+        const [firstKey, firstValue] = countWins.entries().next().value
+        console.log("special tie inside", firstKey, firstValue)
+        // we check if winner is higher seed
+        if (Number(player1Seed.userId) === firstKey && player1Seed.seed < player2Seed.seed) {
+          return player1Seed.userId
+        }
+        if (Number(player2Seed.userId) === firstKey && player1Seed.seed > player2Seed.seed) {
+          return player2Seed.userId
+        }
+      }
+    }
+
+    // if no winner after 3 games, higher seed wins
+    if (games.length === 3 && !winnerId) {
+      console.log("higher seed wins!")
+      if (player1Seed.seed < player2Seed.seed) {
+        return player1Seed.userId
+      } else {
+        return player2Seed.userId
+      }
+    }
+    return winnerId;
+  }
+
+  async updateITSLPlayoffBracket(data: SubmitGameDto, due_date: Date) {
+    const userId = data.gameWinner === "1" ? BigInt(data.usaPlayerId) : BigInt(data.ussrPlayerId)
+    const tId = data.tournamentId
+
+    // Check best_of_games
+    const BO = 3// await this.playoffsService.getBOFromPlayoff(userId, tId)
+
+    if (BO > 1) {
+      // Select on game_results games by tId and the 2 players
+      const games = await this.gamesService.getGameByUsers(BigInt(data.usaPlayerId), BigInt(data.ussrPlayerId), Number(data.tournamentId))
+      const player1Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.usaPlayerId), Number(data.tournamentId))
+      const player2Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.ussrPlayerId), Number(data.tournamentId))
+      const winnerId = this.getSeriesWinner(games, BO, player1Seed, player2Seed)
+      console.log("winnerId", winnerId)
+      // if there's a winner considering BO
+      if (winnerId) {
+        const smtpConfig: SMTPConfig = {
+          host: process.env.SMTP_HOST || 'localhost',
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          user: process.env.SMTP_USER_JUNTA || '',
+          password: process.env.SMTP_PWD_JUNTA || '',
+        };
+
+        const emailSent = await this.emailService.sendPlayoffsEmailAdminNotification(
+          ['juli.arnalot@gmail.com'],
+          winnerId,
+          smtpConfig
+        );
+        console.log("email sent")
+      } else {
+        // create a new schedule with sides switched
+        this.scheduleService.addSchedulePlayers(
+          data.ussrPlayerId,
+          data.usaPlayerId,
+          Number(data.tournamentId),
+          due_date,
+          this.scheduleService.generateCode()
+        )
+      }
+    }
+  }
 
   @Post('submit')
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
       const data = submitGameRequest.data;
-
-      if (submitGameRequest.data.scheduleId) {
+      const tournamentHardcoded = (["345", "346", "347", "348", "318"].includes(data.tournamentId))
+      if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
         // Validate schedule integrity before submission
         const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
           usaPlayerId: Number(data.usaPlayerId),
@@ -206,10 +316,15 @@ export class GamesController {
       const result = await this.gamesService.submitGame(submitGameRequest.data);
 
       if (result && submitGameRequest.data.scheduleId) {
-        await this.scheduleService.updateSchedule({
+        const updatedSchedule = await this.scheduleService.updateSchedule({
           gameResultId: result.id,
           scheduleId: Number(submitGameRequest.data.scheduleId),
         });
+
+        // if tournament is ITSL main playoff
+        if (["347","346"].includes(data.tournamentId)) {
+          this.updateITSLPlayoffBracket(data, updatedSchedule.due_date)
+        }
       }
       return result;
     } catch (error) {
@@ -226,7 +341,16 @@ export class GamesController {
   async recreateGame(@Body() body: { data: RecreateGameDto }, @Req() req: any) {
     try {
       const user = req.user;
-      const result = await this.gamesService.recreateGame(body.data, user.role, user.mail);
+      const data = body.data;
+      const result = await this.gamesService.recreateGame(data, user.role, user.mail);
+
+      // If scheduleId is provided, update the schedule with the game result
+      if (result && data.scheduleId) {
+        await this.scheduleService.updateSchedule({
+          gameResultId: result.id,
+          scheduleId: Number(data.scheduleId),
+        });
+      }
 
       // Convert BigInt to string for JSON serialization
       const resultParsed = JSON.stringify(result, (_key, value) =>
