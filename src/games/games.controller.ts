@@ -288,7 +288,7 @@ export class GamesController {
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
       const data = submitGameRequest.data;
-      const tournamentHardcoded = (["325", "326", "327", "328", "318"].includes(data.tournamentId))
+      const tournamentHardcoded = (["345", "346", "347", "348", "318"].includes(data.tournamentId))
       if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
         // Validate schedule integrity before submission
         const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
@@ -322,7 +322,7 @@ export class GamesController {
         });
 
         // if tournament is ITSL main playoff
-        if (["327","326"].includes(data.tournamentId)) {
+        if (["347","346"].includes(data.tournamentId)) {
           this.updateITSLPlayoffBracket(data, updatedSchedule.due_date)
         }
       }

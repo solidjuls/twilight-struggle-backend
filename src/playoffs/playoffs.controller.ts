@@ -221,7 +221,7 @@ export class PlayoffsController {
         password: process.env.SMTP_PWD_JUNTA || '',
       };
 
-      const destEmails = ['juli.arnalot@gmail.com']// [userOne.email, userTwo.email].filter(Boolean) as string[];
+      const destEmails = [userOne.email, userTwo.email].filter(Boolean) as string[];
 
       let emailSent = false;
       if (destEmails.length > 0) {
