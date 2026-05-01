@@ -247,7 +247,7 @@ export class ScheduleService {
       result += chars[randomIndex];
     }
 
-    return result;
+    return result.toUpperCase();
   }
 
   async addSchedulePlayers(

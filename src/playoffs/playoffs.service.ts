@@ -43,6 +43,16 @@ export class PlayoffsService {
     return finalBO.best_of_games || 3
   }
 
+    async getSeedsFromPlayers(userId: bigint, tID: number) {
+      const result =  await this.databaseService.playoff_bracket.findFirst({
+        select: {
+          seed: true,
+        },
+        where: { userId: userId, tournament_id: tID },
+      });
+      return { userId, seed: result.seed }
+    }
+
   async updateBracketFromSubmit(
     userId: bigint,
     tournamentId: number

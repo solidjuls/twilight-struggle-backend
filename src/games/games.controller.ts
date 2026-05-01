@@ -21,6 +21,7 @@ import {
   RecreateGameDto,
   GetGameChartQueryDto,
   SubmitGameDto,
+  SeedType,
 } from './dto/game.dto';
 import { ScheduleService } from 'src/schedule/schedule.service';
 import { PlayoffsService } from 'src/playoffs/playoffs.service';
@@ -181,15 +182,17 @@ export class GamesController {
     }
   }
 
+  
   getSeriesWinner(games: {
     id: bigint;
     usa_player_id: bigint;
     ussr_player_id: bigint;
     game_winner: string;
-}[], bestOf: number): bigint | null {
+}[], bestOf: number, player1Seed: SeedType, player2Seed: SeedType): bigint | null {
     if (games.length === 0) return null;
 
     const countWins = new Map<number, number>();
+    let tieCase = false
     for (const game of games) {
       if (game.game_winner === "1") {
         const usaId = Number(game.usa_player_id)
@@ -199,13 +202,41 @@ export class GamesController {
         const ussrId = Number(game.ussr_player_id)
         countWins.set(ussrId, (countWins.get(ussrId) || 0) + 1)
       }
+      if (game.game_winner === "3") {
+        tieCase = true
+      }
     }
-    // console.log("games", games, Math.ceil(bestOf / 2), usaWins, ussrWins)
 
     const neededToWin = Math.ceil(bestOf / 2);
     let winnerId = null
     for (const [key, value] of countWins) {
       if (value === neededToWin) winnerId = key;
+    }
+
+    // if there is a tie, there's a winner if the higher seed has won 1 game
+    if (tieCase && games.length === 2 && !winnerId) {
+      console.log("special tie case!", countWins, countWins.entries.length)
+      if (countWins.size > 0) {
+        const [firstKey, firstValue] = countWins.entries().next().value
+        console.log("special tie inside", firstKey, firstValue)
+        // we check if winner is higher seed
+        if (Number(player1Seed.userId) === firstKey && player1Seed.seed < player2Seed.seed) {
+          return player1Seed.userId
+        }
+        if (Number(player2Seed.userId) === firstKey && player1Seed.seed > player2Seed.seed) {
+          return player2Seed.userId
+        }
+      }
+    }
+
+    // if no winner after 3 games, higher seed wins
+    if (games.length === 3 && !winnerId) {
+      console.log("higher seed wins!")
+      if (player1Seed.seed < player2Seed.seed) {
+        return player1Seed.userId
+      } else {
+        return player2Seed.userId
+      }
     }
     return winnerId;
   }
@@ -220,21 +251,12 @@ export class GamesController {
     if (BO > 1) {
       // Select on game_results games by tId and the 2 players
       const games = await this.gamesService.getGameByUsers(BigInt(data.usaPlayerId), BigInt(data.ussrPlayerId), Number(data.tournamentId))
-
-      const winnerId = this.getSeriesWinner(games, BO)
+      const player1Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.usaPlayerId), Number(data.tournamentId))
+      const player2Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.ussrPlayerId), Number(data.tournamentId))
+      const winnerId = this.getSeriesWinner(games, BO, player1Seed, player2Seed)
       console.log("winnerId", winnerId)
       // if there's a winner considering BO
       if (winnerId) {
-        // update bracket, create schedule and send email
-        // const userIds = await this.playoffsService.updateBracketFromSubmit(userId, Number(data.tournamentId))
-
-        // let users: UserDetailDto[] = []
-        // if (userIds.length === 2) {
-        //   for (const userId of userIds) {
-        //     const user = await this.usersService.getUserById(userId.toString())
-        //     users.push(user)
-        //   }
-        // }
         const smtpConfig: SMTPConfig = {
           host: process.env.SMTP_HOST || 'localhost',
           port: parseInt(process.env.SMTP_PORT || '587'),
@@ -242,18 +264,6 @@ export class GamesController {
           user: process.env.SMTP_USER_JUNTA || '',
           password: process.env.SMTP_PWD_JUNTA || '',
         };
-        // console.log("smtpConfig", smtpConfig)
-
-        // const playerOne = `${users[0].first_name} ${users[0].last_name} (Playdek: ${users[0].playdek_name}) - Timezone: ${users[0].timezone_id}`
-        // const playerTwo = `${users[1].first_name} ${users[1].last_name} (Playdek: ${users[1].playdek_name}) - Timezone: ${users[1].timezone_id}`
-
-        // this.scheduleService.addSchedulePlayers(
-        //   users[0].id,
-        //   users[1].id,
-        //   Number(data.tournamentId),
-        //   new Date(),
-        //   'J002'
-        // )
 
         const emailSent = await this.emailService.sendPlayoffsEmailAdminNotification(
           ['juli.arnalot@gmail.com'],
@@ -268,14 +278,10 @@ export class GamesController {
           data.usaPlayerId,
           Number(data.tournamentId),
           due_date,
-          'J002'
+          this.scheduleService.generateCode()
         )
       }
     }
-      
-
-    // send email with newly schedule created
-    
   }
 
   @Post('submit')

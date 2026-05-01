@@ -37,6 +37,11 @@ export interface GameDto {
 
 export type GameWinner = "1" | "2" | "3";
 
+export interface SeedType {
+  userId: bigint;
+  seed: number;
+}
+
 export interface SubmitGameDto {
   scheduleId?: string;
   gameWinner: GameWinner;
