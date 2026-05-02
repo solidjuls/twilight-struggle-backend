@@ -61,11 +61,11 @@ export class ScheduleService {
     }
 
     // Add pending games filter (games without results)
-    if (onlyPending) {
+    // if (onlyPending) {
       where.AND.push({
         game_results_id: null
       });
-    }
+    // }
 
     // Build dynamic orderBy based on parameters
     const prismaOrderBy: any = [];
