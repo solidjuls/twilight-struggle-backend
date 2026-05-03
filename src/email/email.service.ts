@@ -20,11 +20,11 @@ export interface SMTPConfig {
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
-  private readonly playoffsBodyEmailAdminNotification = (winnerId: bigint) => `
+  private readonly playoffsBodyEmailAdminNotification = (winnerId: bigint | null) => `
     A playoffs round has been updated. The winner is ${winnerId}.
     Take a look and create the next round!!!
   `
-  private readonly playoffsBodyEmail = (tournamentName: string, dueDate: string, playerOne: string, playerTwo: string) => `
+  private readonly playoffsBodyEmail = (tournamentName: string, dueDate: string, higherSeedPlayer: string, lowerSeedPlayer: string) => `
 <p>Dear players,</p>
 
 <p>Your next ${tournamentName} game is ready!</p>
@@ -35,8 +35,8 @@ export class EmailService {
 
 <p>
 Due Date: ${dueDate}<br>
-Higher seed Player: ${playerOne} <br>
-Lower seed Player: ${playerTwo} 
+Higher seed Player: ${higherSeedPlayer} <br>
+Lower seed Player: ${lowerSeedPlayer} 
 </p>
 
 <p>(Both players are copied in this email, so you can simply reply all and remove my address for scheduling.)</p>
@@ -70,7 +70,7 @@ Remember that you can find the complete schedule here:<br>
 <p><strong>ITS Junta</strong></p>
 `
 
-  async sendPlayoffsEmailAdminNotification(destEmails: string[], winnerId: bigint, smtpConfig: SMTPConfig) {
+  async sendPlayoffsEmailAdminNotification(destEmails: string[], winnerId: bigint | null, smtpConfig: SMTPConfig) {
     const email: EmailOptions = {
       subject: 'ITSL - Playoffs update',
       text: "",
@@ -81,11 +81,11 @@ Remember that you can find the complete schedule here:<br>
     this.sendEmail(email, smtpConfig)
   }
 
-  async sendPlayoffsEmail(destEmails: string[], tournamentName: string, dueDate: string, namePlayerOne: string, namePlayerTwo: string, smtpConfig: SMTPConfig) {
+  async sendPlayoffsEmail(destEmails: string[], tournamentName: string, dueDate: string, usaPlayer: string, ussrPlayerTwo: string ,smtpConfig: SMTPConfig) {
     const email: EmailOptions = {
       subject: tournamentName,
       text: "",
-      html: this.playoffsBodyEmail(tournamentName, dueDate, namePlayerOne, namePlayerTwo),
+      html: this.playoffsBodyEmail(tournamentName, dueDate, usaPlayer, ussrPlayerTwo),
       to: destEmails
     }
 

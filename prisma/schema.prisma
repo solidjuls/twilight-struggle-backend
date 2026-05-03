@@ -223,6 +223,7 @@ model schedule {
   created_at                           DateTime?     @default(now()) @db.Timestamp(0)
   updated_at                           DateTime?     @default(now()) @db.Timestamp(0)
   random_sides                         Boolean?      @default(dbgenerated("b'0'")) @db.Bit(1)
+  best_of                              Int?
   tournaments                          tournaments   @relation(fields: [tournaments_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_1")
   users_schedule_usa_player_idTousers  users?        @relation("schedule_usa_player_idTousers", fields: [usa_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_2")
   users_schedule_ussr_player_idTousers users?        @relation("schedule_ussr_player_idTousers", fields: [ussr_player_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "schedule_ibfk_3")
@@ -292,7 +293,6 @@ model playoff_bracket {
   tournament_id Int?
   id            Int          @id @default(autoincrement())
   seed          Int?
-  best_of_games Int?
   winnerUserId  Boolean      @default(dbgenerated("b'0'")) @db.Bit(1)
   tournaments   tournaments? @relation(fields: [tournament_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_tournament")
   users         users?       @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_playoff_user")

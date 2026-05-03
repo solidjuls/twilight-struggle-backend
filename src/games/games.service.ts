@@ -220,6 +220,9 @@ export class GamesService {
   }
 
   async getGameByUsers(idPlayer1: bigint, idPlayer2: bigint, tId: number) {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const games = await this.databaseService.game_results.findMany({
       select: {
         id: true,
@@ -229,6 +232,9 @@ export class GamesService {
       },
       where: {
         tournament_id: tId,
+        game_date: {
+          gte: thirtyDaysAgo
+        },
         OR: [
           {
             AND: [
