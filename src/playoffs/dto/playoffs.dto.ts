@@ -34,6 +34,8 @@ export interface PlayoffSummaryDto {
 export interface CreatePlayoffScheduleDto {
   usaPlayerId: string;
   ussrPlayerId: string;
+  usaSeed: string;
+  ussrSeed: string;
   randomSides: boolean;
   tournamentId: number;
   tournamentName: string;

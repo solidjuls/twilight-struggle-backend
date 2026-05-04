@@ -241,37 +241,22 @@ export class GamesController {
     return winnerId;
   }
 
-  async updateITSLPlayoffBracket(data: SubmitGameDto, due_date: Date) {
+  async updateITSLPlayoffSchedule(data: SubmitGameDto, due_date: Date, bestOf: number) {
     const userId = data.gameWinner === "1" ? BigInt(data.usaPlayerId) : BigInt(data.ussrPlayerId)
     const tId = data.tournamentId
 
     // Check best_of_games
-    const BO = 3// await this.playoffsService.getBOFromPlayoff(userId, tId)
-
-    if (BO > 1) {
-      // Select on game_results games by tId and the 2 players
+    // const BO = 3// await this.playoffsService.getBOFromPlayoff(userId, tId)
+    let winnerId = null;
+    if (bestOf > 1) {
+      // Select on game_results games 30 days old by tId, the 2 players
       const games = await this.gamesService.getGameByUsers(BigInt(data.usaPlayerId), BigInt(data.ussrPlayerId), Number(data.tournamentId))
       const player1Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.usaPlayerId), Number(data.tournamentId))
       const player2Seed = await this.playoffsService.getSeedsFromPlayers(BigInt(data.ussrPlayerId), Number(data.tournamentId))
-      const winnerId = this.getSeriesWinner(games, BO, player1Seed, player2Seed)
-      console.log("winnerId", winnerId)
-      // if there's a winner considering BO
-      if (winnerId) {
-        const smtpConfig: SMTPConfig = {
-          host: process.env.SMTP_HOST || 'localhost',
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: process.env.SMTP_SECURE === 'true',
-          user: process.env.SMTP_USER_JUNTA || '',
-          password: process.env.SMTP_PWD_JUNTA || '',
-        };
+      const winnerId = this.getSeriesWinner(games, bestOf, player1Seed, player2Seed)
 
-        const emailSent = await this.emailService.sendPlayoffsEmailAdminNotification(
-          ['juli.arnalot@gmail.com'],
-          winnerId,
-          smtpConfig
-        );
-        console.log("email sent")
-      } else {
+      // if there's a winner considering BO
+      if (!winnerId) {
         // create a new schedule with sides switched
         this.scheduleService.addSchedulePlayers(
           data.ussrPlayerId,
@@ -282,6 +267,19 @@ export class GamesController {
         )
       }
     }
+    const smtpConfig: SMTPConfig = {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER_JUNTA || '',
+      password: process.env.SMTP_PWD_JUNTA || '',
+    };
+
+    await this.emailService.sendPlayoffsEmailAdminNotification(
+      ['juli.arnalot@gmail.com'],
+      winnerId,
+      smtpConfig
+    );
   }
 
   @Post('submit')
@@ -320,10 +318,11 @@ export class GamesController {
           gameResultId: result.id,
           scheduleId: Number(submitGameRequest.data.scheduleId),
         });
-
+        
         // if tournament is ITSL main playoff
-        if (["347","346"].includes(data.tournamentId)) {
-          this.updateITSLPlayoffBracket(data, updatedSchedule.due_date)
+        // if (["347","345"].includes(data.tournamentId)) {
+        if (updatedSchedule.best_of) {
+          this.updateITSLPlayoffSchedule(data, updatedSchedule.due_date, updatedSchedule.best_of)
         }
       }
       return result;

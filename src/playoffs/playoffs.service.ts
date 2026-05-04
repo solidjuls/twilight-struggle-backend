@@ -17,32 +17,6 @@ const PLAYOFF_MATCHUP_DUE_DAYS = 7;
 export class PlayoffsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  highestRValue(params: string[]) {
-    if (params.length === 0) return null;
-
-    return params.reduce((maxStr, currentStr) => {
-      const currentNum = parseInt(currentStr.match(/r(\d+)/)?.[1] || "0", 10);
-      const maxNum = parseInt(maxStr.match(/r(\d+)/)?.[1] || "0", 10);
-
-      return currentNum > maxNum ? currentStr : maxStr;
-    });
-  }
-
-  async getBOFromPlayoff(userId: bigint, tID: string) {
-    const userBrackets = await this.databaseService.playoff_bracket.findMany({
-      select: {
-        best_of_games: true,
-        playoffSquare: true
-      },
-      where: { userId: userId, tournament_id: Number(tID) },
-    });
-
-    // We must find which bracket is related to this userId
-    const currentPlayoffSquare = this.highestRValue(userBrackets.map(item => item.playoffSquare))
-    const finalBO = userBrackets.find(item => item.playoffSquare === currentPlayoffSquare)
-    return finalBO.best_of_games || 3
-  }
-
     async getSeedsFromPlayers(userId: bigint, tID: number) {
       const result =  await this.databaseService.playoff_bracket.findFirst({
         select: {
@@ -52,44 +26,6 @@ export class PlayoffsService {
       });
       return { userId, seed: result.seed }
     }
-
-  async updateBracketFromSubmit(
-    userId: bigint,
-    tournamentId: number
-  ) {
-    const userBrackets = await this.databaseService.playoff_bracket.findMany({
-      select: {
-        nextSquare: true,
-        id: true
-      },
-      where: { userId: userId },
-    });
-    
-    const nextSquare = this.highestRValue(userBrackets.map(item => item.nextSquare))
-    const nextItem = userBrackets.find(item => item.nextSquare === nextSquare)
-    const squareForEmail = await this.databaseService.playoff_bracket.update({
-      data: {
-        userId,
-      },
-      select: {
-        nextSquare: true
-      },
-      where: {
-        playoffSquare: nextItem.nextSquare,
-        id: nextItem.id
-      }
-    })
-    const playersFromNewBracket = await this.databaseService.playoff_bracket.findMany({
-      select: {
-        userId: true
-      },
-      where: {
-        nextSquare: squareForEmail?.nextSquare
-      }
-    })
-
-    return playersFromNewBracket.map(item => item.userId)
-  }
 
   async createPlayoffBracket(
     data: PlayoffEntryDto[],

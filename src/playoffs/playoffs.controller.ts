@@ -168,7 +168,7 @@ export class PlayoffsController {
     @Body() body: CreatePlayoffScheduleDto,
   ): Promise<CreatePlayoffScheduleResultDto> {
     try {
-      const { usaPlayerId, ussrPlayerId, tournamentId, randomSides, due_date } = body;
+      const { usaPlayerId, ussrPlayerId, usaSeed, ussrSeed, tournamentId, randomSides, due_date } = body;
 
       // Validate required fields
       if (!usaPlayerId || !ussrPlayerId || !tournamentId || !due_date) {
@@ -179,12 +179,12 @@ export class PlayoffsController {
       }
 
       // Fetch user details
-      const [userOne, userTwo] = await Promise.all([
+      const [userUsa, userUssr] = await Promise.all([
         this.usersService.getUserById(usaPlayerId),
         this.usersService.getUserById(ussrPlayerId),
       ]);
 
-      if (!userOne || !userTwo) {
+      if (!userUsa || !userUssr) {
         throw new HttpException(
           'One or both players not found',
           HttpStatus.NOT_FOUND,
@@ -210,8 +210,8 @@ export class PlayoffsController {
       );
       const tournament = await this.tournamentService.getTournamentsById([tournamentId.toString()])
 
-      const playerOne = `${userOne.first_name} ${userOne.last_name} (Playdek: ${userOne.playdek_name})`;
-      const playerTwo = `${userTwo.first_name} ${userTwo.last_name} (Playdek: ${userTwo.playdek_name})`;
+      const playerUsa = `${userUsa.first_name} ${userUsa.last_name} Seed: ${usaSeed} (Playdek: ${userUsa.playdek_name})`;
+      const playerUssr = `${userUssr.first_name} ${userUssr.last_name} Seed: ${ussrSeed} (Playdek: ${userUssr.playdek_name})`;
 
       const smtpConfig: SMTPConfig = {
         host: process.env.SMTP_HOST || 'localhost',
@@ -221,16 +221,30 @@ export class PlayoffsController {
         password: process.env.SMTP_PWD_JUNTA || '',
       };
 
-      const destEmails = [userOne.email, userTwo.email].filter(Boolean) as string[];
+      const destEmails = [userUsa.email, userUssr.email].filter(Boolean) as string[];
 
       let emailSent = false;
+// && process.env.NODE_ENV !== 'development'
       if (destEmails.length > 0) {
+        const usaSeedn = Number(usaSeed)
+        const ussrSeedn = Number(ussrSeed)
+        let higher = null
+        let lower = null
+        // lower seed is "higher", don't forget
+        if(usaSeedn < ussrSeedn) {
+          higher = playerUsa
+          lower = playerUssr
+        } else {
+           higher = playerUssr
+           lower = playerUsa
+        }
+
         await this.emailService.sendPlayoffsEmail(
           destEmails,
           tournament[0].tournament_name,
           dueDateFormatted,
-          playerOne,
-          playerTwo,
+          higher,
+          lower,
           smtpConfig,
         );
         emailSent = true;

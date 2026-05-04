@@ -99,6 +99,7 @@ export interface ScheduleUpdateResult {
   game_results_id: bigint | null;
   created_at: Date | null;
   updated_at: Date | null;
+  best_of: number | null;
 }
 
 export interface ScheduleListResponse {
