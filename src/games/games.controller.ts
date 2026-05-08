@@ -263,7 +263,9 @@ export class GamesController {
           data.usaPlayerId,
           Number(data.tournamentId),
           due_date,
-          this.scheduleService.generateCode()
+          this.scheduleService.generateCode(),
+          bestOf,
+          false
         )
       }
     }
