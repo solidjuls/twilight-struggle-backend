@@ -168,7 +168,7 @@ export class PlayoffsController {
     @Body() body: CreatePlayoffScheduleDto,
   ): Promise<CreatePlayoffScheduleResultDto> {
     try {
-      const { usaPlayerId, ussrPlayerId, usaSeed, ussrSeed, tournamentId, randomSides, due_date } = body;
+      const { usaPlayerId, ussrPlayerId, usaSeed, ussrSeed, tournamentId, randomSides, bo, due_date } = body;
 
       // Validate required fields
       if (!usaPlayerId || !ussrPlayerId || !tournamentId || !due_date) {
@@ -200,12 +200,16 @@ export class PlayoffsController {
       });
 
       const gameCode = this.scheduleService.generateCode()
+      let bestOf = null
+      if (bo) bestOf = Number(bo)
+
       const schedule = await this.scheduleService.addSchedulePlayers(
         usaPlayerId,
         ussrPlayerId,
         tournamentId,
         dueDate,
         gameCode,
+        bestOf,
         randomSides
       );
       const tournament = await this.tournamentService.getTournamentsById([tournamentId.toString()])

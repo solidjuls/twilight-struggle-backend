@@ -41,6 +41,7 @@ export interface CreatePlayoffScheduleDto {
   tournamentName: string;
   gameCode: string;
   due_date: Date;
+  bo: string;
 }
 
 export interface CreatePlayoffScheduleResultDto {
