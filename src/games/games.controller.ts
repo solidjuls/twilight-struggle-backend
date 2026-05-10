@@ -288,31 +288,31 @@ export class GamesController {
   async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
     try {
       const data = submitGameRequest.data;
-      const tournamentHardcoded = (["345", "346", "347", "348", "318"].includes(data.tournamentId))
-      if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
-        // Validate schedule integrity before submission
-        const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
-          usaPlayerId: Number(data.usaPlayerId),
-          id: Number(data.scheduleId),
-          ussrPlayerId: Number(data.ussrPlayerId),
-          gameCode: data.gameCode,
-          tournamentId: Number(data.tournamentId),
-        });
+      // const tournamentHardcoded = (["345", "346", "347", "348", "318"].includes(data.tournamentId))
+      // if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
+      //   // Validate schedule integrity before submission
+      //   const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
+      //     usaPlayerId: Number(data.usaPlayerId),
+      //     id: Number(data.scheduleId),
+      //     ussrPlayerId: Number(data.ussrPlayerId),
+      //     gameCode: data.gameCode,
+      //     tournamentId: Number(data.tournamentId),
+      //   });
 
-        if (validateSchedule?.game_results_id) {
-          throw new HttpException(
-            `Schedule ${data.scheduleId} already submitted`,
-            HttpStatus.BAD_REQUEST,
-          );
-        }
+      //   if (validateSchedule?.game_results_id) {
+      //     throw new HttpException(
+      //       `Schedule ${data.scheduleId} already submitted`,
+      //       HttpStatus.BAD_REQUEST,
+      //     );
+      //   }
 
-        if (!validateSchedule?.id) {
-          throw new HttpException(
-            'Schedule not found',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-      }
+      //   if (!validateSchedule?.id) {
+      //     throw new HttpException(
+      //       'Schedule not found',
+      //       HttpStatus.BAD_REQUEST,
+      //     );
+      //   }
+      // }
       const result = await this.gamesService.submitGame(submitGameRequest.data);
 
       if (result && submitGameRequest.data.scheduleId) {
