@@ -253,14 +253,13 @@ export class TournamentsController {
         throw new HttpException('Registration ID is required', HttpStatus.BAD_REQUEST);
       }
 
-      const result = await this.tournamentsService.forfeitPlayer(
+      await this.tournamentsService.forfeitPlayer(
         parseInt(tournamentId),
         body.registrationId
       );
 
       return {
         message: 'Player has been forfeited from the tournament',
-        result
       };
     } catch (error) {
       console.error("TOURNAMENT FORFEIT API Error:", error);
@@ -324,14 +323,13 @@ export class TournamentsController {
         throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
       }
 
-      const result = await this.tournamentsService.addTournamentAdmin(
+      await this.tournamentsService.addTournamentAdmin(
         parseInt(tournamentId),
         body.userId
       );
 
       return {
         message: 'Successfully added tournament admin',
-        result
       };
     } catch (error) {
       console.error("ADD TOURNAMENT ADMIN API Error:", error);
