@@ -132,6 +132,7 @@ export class TournamentsService {
     const registrations = await this.databaseService.tournament_registration.findMany({
       where: {
         tournamentId: tournamentId,
+        status: 'pending'
       },
       select: {
         id: true,
@@ -315,6 +316,7 @@ export class TournamentsService {
     const registrations = await this.databaseService.tournament_registration.findMany({
       where: {
         userId: BigInt(userId),
+        status: 'pending'
       },
       include: {
         tournaments: {
