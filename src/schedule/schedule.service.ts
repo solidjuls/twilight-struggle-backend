@@ -116,6 +116,7 @@ export class ScheduleService {
         game_results_id: true,
         due_date: true,
         random_sides: true,
+        best_of: true,
         tournaments: {
           select: {
             tournament_name: true,
@@ -159,6 +160,7 @@ export class ScheduleService {
       dueDate: result.due_date.toISOString(),
       gameCode: result.game_code,
       randomSides: result.random_sides,
+      bestOf: result.best_of,
       id: result.id.toString(),
       gameResultsId: result.game_results_id?.toString() || null,
       nameUsa: `${result.users_schedule_usa_player_idTousers?.first_name || ''} ${result.users_schedule_usa_player_idTousers?.last_name || ''}`,
@@ -355,6 +357,7 @@ export class ScheduleService {
       tournaments_id: tournamentId,
       usa_player_id: BigInt(row.usa_player_id),
       ussr_player_id: BigInt(row.ussr_player_id),
+      random_sides: row.random ? Boolean(Number(row.random)) : false
     }));
 
     // Bulk insert all records at once
