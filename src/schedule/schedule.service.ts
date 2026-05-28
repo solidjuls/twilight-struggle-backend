@@ -355,6 +355,7 @@ export class ScheduleService {
       tournaments_id: tournamentId,
       usa_player_id: BigInt(row.usa_player_id),
       ussr_player_id: BigInt(row.ussr_player_id),
+      random_sides: row.random ? Boolean(Number(row.random)) : false
     }));
 
     // Bulk insert all records at once
