@@ -1173,10 +1173,33 @@ console.log("scheduleParsed", scheduleParsed);
     // Get ongoing tournaments (status_id = 4) that have no scheduled games
     const tournaments = await this.databaseService.tournaments.findMany({
       where: {
-        status_id: 4, // Ongoing status
-        schedule: {
-          none: {} // No scheduled games
-        }
+        status_id: 4,
+        parent_id: null,
+        // NOT EXISTS child tournaments (no children)
+        children: {
+          none: {}
+        },
+
+        OR: [
+          // NOT EXISTS schedule at all
+          {
+            schedule: {
+              none: {}
+            }
+          },
+
+          // OR: no schedule row with NULL game_results_id
+          {
+            schedule: {
+              none: {
+                game_results_id: null
+              }
+            }
+          }
+        ]
+      },
+      orderBy: {
+        created_at: 'desc'
       },
       select: {
         id: true,
@@ -1197,9 +1220,6 @@ console.log("scheduleParsed", scheduleParsed);
           }
         }
       },
-      orderBy: {
-        created_at: 'desc'
-      }
     });
 
     // Transform the data to match the expected Tournament interface
