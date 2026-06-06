@@ -50,17 +50,17 @@ export class TournamentsController {
           user?.role,
           user?.id?.toString()
         );
-        // // add the rating for each registered user
-        // const registeredPlayersWithRating = await Promise.all(
-        //   registeredPlayers.map(async (player) => {
-        //     const rating = await this.userService.getUserRating(BigInt(player.userId));
-        //     return {
-        //       ...player,
-        //       rating
-        //     };
-        //   })
-        // );
-        return registeredPlayers;
+        // add the rating for each registered user
+        const registeredPlayersWithRating = await Promise.all(
+          registeredPlayers.map(async (player) => {
+            const rating = await this.userService.getUserRating(BigInt(player.userId));
+            return {
+              ...player,
+              rating
+            };
+          })
+        );
+        return registeredPlayersWithRating;
       }
 
       // Get tournaments by ID(s)
