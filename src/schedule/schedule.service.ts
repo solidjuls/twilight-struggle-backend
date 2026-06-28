@@ -2,17 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import {
   ScheduleDto,
-  CreateScheduleDto,
-  UpdateScheduleDto,
-  ReplacePlayersDto,
-  DeletePlayerDto,
   ValidateScheduleDto,
   ScheduleValidationResult,
   ScheduleUpdateResult,
   ScheduleListResponse,
   UploadCsvScheduleDto,
-  CsvScheduleRow
 } from './dto/schedule.dto';
+import { TournamentDto } from 'src/tournaments/dto/tournament.dto';
 
 @Injectable()
 export class ScheduleService {
@@ -183,6 +179,50 @@ export class ScheduleService {
     };
   }
 
+  async filterTournamentsBySchedule(tournaments: TournamentDto[], userId: number) {
+    if (!tournaments.length) {
+      return [];
+    }
+  
+    const where: any = {
+      AND: []
+    };
+    where.AND.push({
+      OR: [
+        { usa_player_id: userId },
+        { ussr_player_id: userId },
+      ],
+    });
+    const tournamentIds = tournaments.map((t) => Number(t.id));
+
+    where.AND.push({
+      tournaments_id: {
+        in: tournamentIds,
+      },
+    })
+    where.AND.push({
+      game_results_id: null
+    })
+    
+    const schedules = await this.databaseService.schedule.findMany({
+      where,
+      select: {
+        tournaments_id: true,
+      },
+      distinct: ['tournaments_id'],
+    });
+
+    const scheduledTournamentIds = new Set(
+      schedules.map(s => s.tournaments_id),
+    );
+
+    const filteredTournaments = tournaments.filter(t =>
+      scheduledTournamentIds.has(Number(t.id))
+    );
+
+    return filteredTournaments
+  }
+  
   async validateScheduleIntegrity({
     usaPlayerId,
     id,

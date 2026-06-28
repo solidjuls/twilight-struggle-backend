@@ -62,8 +62,9 @@ export class ScheduleController {
       // Get user's registered tournaments first
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
+      const tournamentsWithActiveSchedules = await this.scheduleService.filterTournamentsBySchedule(ongoingUserTournaments, Number(finalUserId));
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
-      const allTournaments = [...ongoingUserTournaments, ...userAdminTournaments]
+      const allTournaments = [...tournamentsWithActiveSchedules, ...userAdminTournaments]
       const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
         index === self.findIndex(t => t.id === tournament.id)
       );
