@@ -86,9 +86,9 @@ export class ScheduleController {
         const childIds = childTournaments.map(t => t.id.toString());
         parsedTournamentIds = [...requestedIds, ...childIds];
       } else if (ongoingUserTournaments.length > 0) {
-        const ongoingTournaments = ongoingUserTournaments.filter(t => t.status_id === 4);
-        const defaultTournament = ongoingTournaments.length > 0
-          ? ongoingTournaments[0]
+        const ongoingUniqueTournaments = uniqueTournaments.filter(t => t.status_id === 4);
+        const defaultTournament = ongoingUniqueTournaments.length > 0
+          ? ongoingUniqueTournaments[0]
           : ongoingUserTournaments[0];
 
         // Get child tournaments for the default tournament
