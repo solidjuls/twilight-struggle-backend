@@ -195,6 +195,13 @@ export class ScheduleService {
     });
     const tournamentIds = tournaments.map((t) => Number(t.id));
 
+    if (tournamentIds.includes(318)) {
+      tournamentIds.push(345)
+      tournamentIds.push(346)
+      tournamentIds.push(347)
+      tournamentIds.push(348)
+    }
+
     where.AND.push({
       tournaments_id: {
         in: tournamentIds,
@@ -215,10 +222,17 @@ export class ScheduleService {
     const scheduledTournamentIds = new Set(
       schedules.map(s => s.tournaments_id),
     );
-
-    const filteredTournaments = tournaments.filter(t =>
-      scheduledTournamentIds.has(Number(t.id))
+    const filteredTournaments = tournaments.filter(t => {
+      if (t.id === "318") {
+        if (scheduledTournamentIds.has(345)) return true
+        if (scheduledTournamentIds.has(346)) return true
+        if (scheduledTournamentIds.has(347)) return true
+        if (scheduledTournamentIds.has(348)) return true
+      }
+      return scheduledTournamentIds.has(Number(t.id))
+    }
     );
+
 
     return filteredTournaments
   }
