@@ -614,18 +614,28 @@ export class TournamentsController {
 
   @Get('generate-result-text')
   async getGameResultsForTextGeneration(
-    @Query('date') date: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
     @Query('tournamentId') tournamentId: string,
+    @Query('video') video: string,
     @CurrentUser() user: JwtPayloadDto,
   ) {
     try {
-      if (!date || !tournamentId) {
-        throw new HttpException('Date and tournamentId query parameters are required', HttpStatus.BAD_REQUEST);
+      if (!startDate || !endDate || !tournamentId) {
+        throw new HttpException('startDate, endDate and tournamentId query parameters are required', HttpStatus.BAD_REQUEST);
       }
 
-      const fromDate = new Date(date);
-      if (isNaN(fromDate.getTime())) {
+      const from = new Date(startDate);
+      const to = new Date(endDate);
+      if (isNaN(from.getTime()) || isNaN(to.getTime())) {
         throw new HttpException('Invalid date format', HttpStatus.BAD_REQUEST);
+      }
+
+      let videoFilter: boolean | undefined;
+      if (video !== undefined && video !== '') {
+        if (video === '1') videoFilter = true;
+        else if (video === '0') videoFilter = false;
+        else throw new HttpException('video must be 0 or 1', HttpStatus.BAD_REQUEST);
       }
 
       const parsedTournamentId = Number(tournamentId);
@@ -641,7 +651,7 @@ export class TournamentsController {
         throw new HttpException('You are not admin of this tournament', HttpStatus.FORBIDDEN);
       }
 
-      const result = await this.tournamentsService.getGameResultsForTextGeneration(fromDate, parsedTournamentId);
+      const result = await this.tournamentsService.getGameResultsForTextGeneration(from, to, parsedTournamentId, videoFilter);
       return result;
     } catch (error) {
       console.error("GENERATE RESULT TEXT API Error:", error);

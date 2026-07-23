@@ -1299,13 +1299,15 @@ console.log("scheduleParsed", scheduleParsed);
     };
   }
 
-  async getGameResultsForTextGeneration(fromDate: Date, tournamentId: number): Promise<any[]> {
+  async getGameResultsForTextGeneration(fromDate: Date, toDate: Date, tournamentId: number, videoFilter?: boolean): Promise<any[]> {
     const gameResults = await this.databaseService.game_results.findMany({
       where: {
         tournament_id: tournamentId,
         game_date: {
           gte: fromDate,
+          lte: toDate,
         },
+        ...(videoFilter === true ? { video1: { not: null } } : {}),
       },
       include: {
         tournaments: {
