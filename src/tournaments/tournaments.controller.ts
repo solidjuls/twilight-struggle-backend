@@ -45,11 +45,16 @@ export class TournamentsController {
       const { id, status, players } = query;
       // Get registered players for a tournament
       if (typeof id === "string" && players === "true") {
-        const registeredPlayers: RegisteredPlayerDto[] = await this.tournamentsService.getRegisteredPlayers(
+        const { players: registeredPlayers, isAdmin } = await this.tournamentsService.getRegisteredPlayers(
           Number(id),
           user?.role,
           user?.id?.toString()
         );
+
+        if (!isAdmin) {
+          return registeredPlayers.map(player => ({ ...player, rating: null }));
+        }
+
         // add the rating for each registered user
         const registeredPlayersWithRating = await Promise.all(
           registeredPlayers.map(async (player) => {

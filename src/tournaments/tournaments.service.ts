@@ -128,7 +128,7 @@ export class TournamentsService {
     tournamentId: number,
     userRole?: number,
     userId?: string
-  ): Promise<RegisteredPlayerDto[]> {
+  ): Promise<{ players: RegisteredPlayerDto[]; isAdmin: boolean }> {
     const registrations = await this.databaseService.tournament_registration.findMany({
       where: {
         tournamentId: tournamentId,
@@ -158,7 +158,7 @@ export class TournamentsService {
 
     const isAdmin = await this.isUserAdminForTournament(userRole, userId, tournamentId);
 
-    return registrations.map(registration => {
+    const players = registrations.map(registration => {
       const user = registration.users;
       return {
         registrationId: registration.id,
@@ -171,6 +171,8 @@ export class TournamentsService {
         countryCode: user?.countries?.tld_code,
       };
     });
+
+    return { players, isAdmin };
   }
 
   async isUserAdminForTournament(userRole?: number, userId?: string, tournamentId?: number): Promise<boolean> {
