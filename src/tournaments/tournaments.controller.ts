@@ -612,6 +612,46 @@ export class TournamentsController {
     }
   }
 
+  @Get('generate-result-text')
+  async getGameResultsForTextGeneration(
+    @Query('date') date: string,
+    @Query('tournamentId') tournamentId: string,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    try {
+      if (!date || !tournamentId) {
+        throw new HttpException('Date and tournamentId query parameters are required', HttpStatus.BAD_REQUEST);
+      }
+
+      const fromDate = new Date(date);
+      if (isNaN(fromDate.getTime())) {
+        throw new HttpException('Invalid date format', HttpStatus.BAD_REQUEST);
+      }
+
+      const parsedTournamentId = Number(tournamentId);
+      const isSuperAdmin = user?.role === 1;
+      const isAdmin = user?.role === 2;
+      const isTournamentAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        parsedTournamentId,
+      );
+
+      if (!isSuperAdmin && !isAdmin && !isTournamentAdmin) {
+        throw new HttpException('You are not admin of this tournament', HttpStatus.FORBIDDEN);
+      }
+
+      const result = await this.tournamentsService.getGameResultsForTextGeneration(fromDate, parsedTournamentId);
+      return result;
+    } catch (error) {
+      console.error("GENERATE RESULT TEXT API Error:", error);
+      throw new HttpException(
+        error.message || 'Internal Server Error',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Get('ongoing-without-schedule')
   async getOngoingTournamentsWithoutSchedule(@CurrentUser() user: JwtPayloadDto) {
     try {
