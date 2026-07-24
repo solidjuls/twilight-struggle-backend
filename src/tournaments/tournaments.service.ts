@@ -1299,4 +1299,60 @@ console.log("scheduleParsed", scheduleParsed);
     };
   }
 
+  async getGameResultsForTextGeneration(fromDate: Date, tournamentId: number): Promise<any[]> {
+    const gameResults = await this.databaseService.game_results.findMany({
+      where: {
+        tournament_id: tournamentId,
+        game_date: {
+          gte: fromDate,
+        },
+      },
+      include: {
+        tournaments: {
+          select: {
+            tournament_name: true,
+          },
+        },
+        users_game_results_usa_player_idTousers: {
+          select: {
+            first_name: true,
+            last_name: true,
+            countries: {
+              select: {
+                tld_code: true,
+              },
+            },
+          },
+        },
+        users_game_results_ussr_player_idTousers: {
+          select: {
+            first_name: true,
+            last_name: true,
+            countries: {
+              select: {
+                tld_code: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        game_date: 'desc',
+      },
+    });
+
+    return gameResults.map((result) => ({
+      tournamentName: result.tournaments?.tournament_name || '',
+      game_code: result.game_code,
+      gameWinner: result.game_winner,
+      endTurn: result.end_turn,
+      endMode: result.end_mode,
+      videoURL: result.video1 || '',
+      usaCountryCode: result.users_game_results_usa_player_idTousers?.countries?.tld_code || '',
+      ussrCountryCode: result.users_game_results_ussr_player_idTousers?.countries?.tld_code || '',
+      usaPlayer: `${result.users_game_results_usa_player_idTousers?.first_name || ''} ${result.users_game_results_usa_player_idTousers?.last_name || ''}`,
+      ussrPlayer: `${result.users_game_results_ussr_player_idTousers?.first_name || ''} ${result.users_game_results_ussr_player_idTousers?.last_name || ''}`,
+    }));
+  }
+
 }
