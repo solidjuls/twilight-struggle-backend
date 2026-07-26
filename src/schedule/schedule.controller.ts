@@ -235,6 +235,14 @@ export class ScheduleController {
     try {
       const { usa, ussr, t, d, gc, randomSides } = body.data;
 
+      const children = await this.tournamentsService.getChildTournaments([Number(t)]);
+      if (children.length > 0) {
+        throw new HttpException(
+          'This tournament has playoffs running. Add the schedule on the correct playoff tab',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const updated = await this.scheduleService.addSchedulePlayers(
         usa,
         ussr,
