@@ -765,6 +765,41 @@ export class TournamentsController {
     }
   }
   
+  // GET /api/tournaments/:id/schedule-admin - Get schedule admin data for tournament repair
+  @Get(':id/schedule-admin')
+  async getScheduleAdminData(
+    @Param('id') tournamentId: string,
+    @CurrentUser() user: JwtPayloadDto,
+    @Query('targetGamesPerPlayer') targetGamesPerPlayer?: string,
+  ) {
+    try {
+      const id = parseInt(tournamentId);
+      if (isNaN(id)) {
+        throw new HttpException('Invalid tournament ID', HttpStatus.BAD_REQUEST);
+      }
+
+      const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        id,
+      );
+
+      if (!isAdmin) {
+        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
+      }
+
+      const targetGames = targetGamesPerPlayer ? parseInt(targetGamesPerPlayer) : 20;
+      const result = await this.tournamentsService.getScheduleAdminData(id, targetGames);
+      return result;
+    } catch (error) {
+      console.error("SCHEDULE ADMIN GET API Error:", error);
+      throw new HttpException(
+        error.message || 'Failed to get schedule admin data',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   // POST /api/tournaments/:id/create-missing-pairs - Create missing schedule pairs based on rating
   @Post(':id/create-missing-pairs')
   async createMissingSchedulePairs(
