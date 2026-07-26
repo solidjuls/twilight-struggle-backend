@@ -1359,6 +1359,178 @@ console.log("scheduleParsed", scheduleParsed);
     }));
   }
 
+  async getScheduleAdminData(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    const tournament = await this.databaseService.tournaments.findUnique({
+      where: { id: tournamentId },
+      select: { id: true, tournament_name: true },
+    });
+
+    if (!tournament) {
+      throw new Error('Tournament not found');
+    }
+
+    const childTournaments = await this.getChildTournaments([tournamentId]);
+    const allTournamentIds = [tournamentId, ...childTournaments.map(c => c.id)];
+
+    const [registrations, schedules, waitlistEntries] = await Promise.all([
+      this.databaseService.tournament_registration.findMany({
+        where: { tournamentId: { in: allTournamentIds } },
+        select: {
+          status: true,
+          users: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              country_id: true,
+            },
+          },
+        },
+      }),
+      this.databaseService.schedule.findMany({
+        where: { tournaments_id: { in: allTournamentIds } },
+        select: {
+          id: true,
+          game_code: true,
+          usa_player_id: true,
+          ussr_player_id: true,
+          due_date: true,
+          game_results_id: true,
+        },
+      }),
+      this.databaseService.tournament_waitlist.findMany({
+        where: { tournamentId: { in: allTournamentIds } },
+        select: {
+          userId: true,
+          created_at: true,
+          users: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              country_id: true,
+            },
+          },
+        },
+        orderBy: { created_at: 'asc' },
+      }),
+    ]);
+
+    const allPlayerIds = new Set<bigint>();
+    for (const reg of registrations) {
+      if (reg.users?.id) allPlayerIds.add(reg.users.id);
+    }
+    for (const entry of waitlistEntries) {
+      if (entry.users?.id) allPlayerIds.add(entry.users.id);
+    }
+
+    const allRatings = await this.databaseService.ratings_history.findMany({
+      where: { player_id: { in: Array.from(allPlayerIds) } },
+      orderBy: { created_at: 'desc' },
+      select: { player_id: true, rating: true },
+    });
+
+    const latestRatingByPlayer = new Map<string, number>();
+    for (const r of allRatings) {
+      const key = r.player_id.toString();
+      if (!latestRatingByPlayer.has(key)) {
+        latestRatingByPlayer.set(key, Number(r.rating));
+      }
+    }
+
+    const toPlayerInfo = (user: { id: bigint; first_name: string | null; last_name: string | null; country_id: bigint | null }) => ({
+      userId: user.id.toString(),
+      fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Player',
+      rating: latestRatingByPlayer.get(user.id.toString()) ?? null,
+      countryId: user.country_id?.toString() ?? null,
+    });
+
+    const forfeitedPlayers = registrations
+      .filter(r => r.status === 'forfeited' && r.users)
+      .map(r => toPlayerInfo(r.users));
+
+    const schedulesWithoutPair = schedules
+      .filter(s => s.game_results_id === null && (s.usa_player_id === null || s.ussr_player_id === null))
+      .map(s => {
+        const hasUsa = s.usa_player_id !== null;
+        const existingPlayerId = hasUsa ? s.usa_player_id : s.ussr_player_id;
+        const existingReg = registrations.find(r => r.users?.id === existingPlayerId);
+        if (!existingReg?.users) return null;
+        return {
+          scheduleId: s.id.toString(),
+          gameCode: s.game_code,
+          dueDate: s.due_date.toISOString(),
+          existingPlayer: {
+            ...toPlayerInfo(existingReg.users),
+            side: hasUsa ? 'usa' : 'ussr',
+          },
+        };
+      })
+      .filter(Boolean);
+
+    const playerGameCount = new Map<string, number>();
+    for (const player of registrations) {
+      if (player.users?.id) {
+        playerGameCount.set(player.users.id.toString(), 0);
+      }
+    }
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+      if (usaId && ussrId) {
+        if (playerGameCount.has(usaId)) playerGameCount.set(usaId, playerGameCount.get(usaId) + 1);
+        if (playerGameCount.has(ussrId)) playerGameCount.set(ussrId, playerGameCount.get(ussrId) + 1);
+      }
+    }
+
+    const activePlayers = registrations.filter(r => r.status !== 'forfeited' && r.users);
+    const seenPlayerIds = new Set<string>();
+    const playersBelowTarget: any[] = [];
+    for (const player of activePlayers) {
+      const idStr = player.users.id.toString();
+      if (seenPlayerIds.has(idStr)) continue;
+      seenPlayerIds.add(idStr);
+
+      const currentGames = playerGameCount.get(idStr) || 0;
+      if (currentGames < targetGamesPerPlayer) {
+        playersBelowTarget.push({
+          ...toPlayerInfo(player.users),
+          currentGames,
+          gamesNeeded: targetGamesPerPlayer - currentGames,
+        });
+      }
+    }
+
+    const seenWaitlistIds = new Set<string>();
+    const waitlistPlayers: any[] = [];
+    for (const entry of waitlistEntries) {
+      const idStr = entry.users.id.toString();
+      if (seenWaitlistIds.has(idStr)) continue;
+      seenWaitlistIds.add(idStr);
+      waitlistPlayers.push({
+        ...toPlayerInfo(entry.users),
+        waitlistedAt: entry.created_at?.toISOString() ?? null,
+      });
+    }
+
+    return {
+      tournamentId: tournament.id.toString(),
+      tournamentName: tournament.tournament_name,
+      forfeitedPlayers,
+      schedulesWithoutPair,
+      playersBelowTarget,
+      waitlistPlayers,
+      summary: {
+        targetGamesPerPlayer,
+        totalActivePlayers: seenPlayerIds.size,
+        totalForfeitedPlayers: forfeitedPlayers.length,
+        totalSchedulesWithoutPair: schedulesWithoutPair.length,
+        totalPlayersBelowTarget: playersBelowTarget.length,
+        totalWaitlistPlayers: waitlistPlayers.length,
+      },
+    };
+  }
+
   findFullNameById(id: bigint, registeredPlayers: any[]) {
     const player = registeredPlayers.find(p => p.users.id === id);
     return player ? `${player.users.first_name} ${player.users.last_name}` : 'Unknown Player';
