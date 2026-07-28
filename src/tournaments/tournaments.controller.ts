@@ -672,12 +672,19 @@ export class TournamentsController {
         throw new HttpException('userIds array is required', HttpStatus.BAD_REQUEST);
       }
 
-      const ratings = await Promise.all(
-        body.userIds.map(async (userId) => {
-          const rating = await this.userService.getUserRating(BigInt(userId));
-          return { userId, rating: rating ?? null };
-        })
-      );
+      const BATCH_SIZE = 10;
+      const ratings: { userId: string; rating: number | null }[] = [];
+
+      for (let i = 0; i < body.userIds.length; i += BATCH_SIZE) {
+        const batch = body.userIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (userId) => {
+            const rating = await this.userService.getUserRating(BigInt(userId));
+            return { userId, rating: rating ?? null };
+          })
+        );
+        ratings.push(...batchResults);
+      }
 
       return ratings;
     } catch (error) {
