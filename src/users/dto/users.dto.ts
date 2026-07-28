@@ -68,7 +68,6 @@ export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;
   playdek_name?: string;
-  email: string;
   phone?: string;
   preferredGamingPlatform?: string;
   preferredGameDuration?: string;
