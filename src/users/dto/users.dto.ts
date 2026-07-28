@@ -70,7 +70,6 @@ export interface UpdateUserDto {
   firstName?: string;
   lastName?: string;
   playdek_name?: string;
-  email: string;
   discord_user_id?: string | null;
   phone?: string;
   preferredGamingPlatform?: string;
