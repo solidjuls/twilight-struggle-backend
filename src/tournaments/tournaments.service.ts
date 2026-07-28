@@ -631,15 +631,45 @@ console.log("scheduleParsed", scheduleParsed);
   }
 
   async forfeitPlayer(tournamentId: number, registrationId: number): Promise<any> {
-    return await this.databaseService.tournament_registration.update({
-      where: {
-        id: registrationId,
-        tournamentId: tournamentId,
-      },
-      data: {
-        status: 'forfeited',
-        updated_at: new Date(),
-      }
+    const registration = await this.databaseService.tournament_registration.findUnique({
+      where: { id: registrationId, tournamentId },
+      select: { userId: true },
+    });
+
+    if (!registration?.userId) {
+      throw new Error('Registration not found or has no associated user');
+    }
+
+    const userId = registration.userId;
+
+    return await this.databaseService.$transaction(async (tx) => {
+      const updated = await tx.tournament_registration.update({
+        where: { id: registrationId, tournamentId },
+        data: {
+          status: 'forfeited',
+          updated_at: new Date(),
+        }
+      });
+
+      await tx.schedule.updateMany({
+        where: {
+          tournaments_id: tournamentId,
+          game_results_id: null,
+          usa_player_id: userId,
+        },
+        data: { usa_player_id: null },
+      });
+
+      await tx.schedule.updateMany({
+        where: {
+          tournaments_id: tournamentId,
+          game_results_id: null,
+          ussr_player_id: userId,
+        },
+        data: { ussr_player_id: null },
+      });
+
+      return updated;
     });
   }
 
