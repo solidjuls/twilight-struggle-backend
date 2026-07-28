@@ -10,6 +10,10 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    "paths": {
+      "rxjs": ["node_modules/rxjs/dist/types/index.d.ts"],
+      "rxjs/*": ["node_modules/rxjs/dist/types/*"]
+    },
     "incremental": true,
     "skipLibCheck": true,
     "strictNullChecks": false,
