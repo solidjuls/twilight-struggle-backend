@@ -45,27 +45,12 @@ export class TournamentsController {
       const { id, status, players } = query;
       // Get registered players for a tournament
       if (typeof id === "string" && players === "true") {
-        const { players: registeredPlayers, isAdmin } = await this.tournamentsService.getRegisteredPlayers(
+        const { players: registeredPlayers } = await this.tournamentsService.getRegisteredPlayers(
           Number(id),
           user?.role,
           user?.id?.toString()
         );
-
-        if (!isAdmin) {
-          return registeredPlayers.map(player => ({ ...player, rating: null }));
-        }
-
-        // add the rating for each registered user
-        const registeredPlayersWithRating = await Promise.all(
-          registeredPlayers.map(async (player) => {
-            const rating = await this.userService.getUserRating(BigInt(player.userId));
-            return {
-              ...player,
-              rating
-            };
-          })
-        );
-        return registeredPlayersWithRating;
+        return registeredPlayers;
       }
 
       // Get tournaments by ID(s)
@@ -677,6 +662,30 @@ export class TournamentsController {
         throw error;
       }
       throw new HttpException('Failed to get ongoing tournaments without schedule', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  @Post('get-players-ratings')
+  async getPlayersRatings(@Body() body: { userIds: string[] }) {
+    try {
+      if (!body.userIds || !Array.isArray(body.userIds)) {
+        throw new HttpException('userIds array is required', HttpStatus.BAD_REQUEST);
+      }
+
+      const ratings = await Promise.all(
+        body.userIds.map(async (userId) => {
+          const rating = await this.userService.getUserRating(BigInt(userId));
+          return { userId, rating: rating ?? null };
+        })
+      );
+
+      return ratings;
+    } catch (error) {
+      console.error("GET PLAYERS RATINGS API Error:", error);
+      throw new HttpException(
+        error.message || 'Internal Server Error',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
