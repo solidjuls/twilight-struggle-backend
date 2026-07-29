@@ -1389,7 +1389,11 @@ console.log("scheduleParsed", scheduleParsed);
     }));
   }
 
+  // Builds the full dataset the admin UI needs to review and fix tournament scheduling.
+  // Returns: forfeited players, half-paired schedule slots, players under the game target,
+  // waitlist entries, and a previous-opponents map so the UI can avoid duplicate matchups.
   async getScheduleAdminData(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    // --- 1. Resolve tournament scope (parent + all children) ---
     const tournament = await this.databaseService.tournaments.findUnique({
       where: { id: tournamentId },
       select: { id: true, tournament_name: true },
@@ -1402,6 +1406,7 @@ console.log("scheduleParsed", scheduleParsed);
     const childTournaments = await this.getChildTournaments([tournamentId]);
     const allTournamentIds = [tournamentId, ...childTournaments.map(c => c.id)];
 
+    // --- 2. Fetch registrations, schedules, and waitlist in parallel ---
     const [registrations, schedules, waitlistEntries] = await Promise.all([
       this.databaseService.tournament_registration.findMany({
         where: { tournamentId: { in: allTournamentIds } },
@@ -1412,7 +1417,7 @@ console.log("scheduleParsed", scheduleParsed);
               id: true,
               first_name: true,
               last_name: true,
-              country_id: true,
+              countries: { select: { tld_code: true } },
             },
           },
         },
@@ -1438,7 +1443,7 @@ console.log("scheduleParsed", scheduleParsed);
               id: true,
               first_name: true,
               last_name: true,
-              country_id: true,
+              countries: { select: { tld_code: true } },
             },
           },
         },
@@ -1446,6 +1451,7 @@ console.log("scheduleParsed", scheduleParsed);
       }),
     ]);
 
+    // --- 3. Resolve each player's latest rating (ratings_history is ordered desc, first wins) ---
     const allPlayerIds = new Set<bigint>();
     for (const reg of registrations) {
       if (reg.users?.id) allPlayerIds.add(reg.users.id);
@@ -1468,17 +1474,20 @@ console.log("scheduleParsed", scheduleParsed);
       }
     }
 
-    const toPlayerInfo = (user: { id: bigint; first_name: string | null; last_name: string | null; country_id: bigint | null }) => ({
+    // Helper: normalize a user row into the shape used across all output lists
+    const toPlayerInfo = (user: { id: bigint; first_name: string | null; last_name: string | null; countries: { tld_code: string } | null }) => ({
       userId: user.id.toString(),
       fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Player',
       rating: latestRatingByPlayer.get(user.id.toString()) ?? null,
-      countryId: user.country_id?.toString() ?? null,
+      tldCode: user.countries?.tld_code ?? null,
     });
 
+    // --- 4. Forfeited players (dropped out, excluded from active pairing) ---
     const forfeitedPlayers = registrations
       .filter(r => r.status === 'forfeited' && r.users)
       .map(r => toPlayerInfo(r.users));
 
+    // --- 5. Schedule slots missing one side (no results yet and one of USA/USSR is null) ---
     const schedulesWithoutPair = schedules
       .filter(s => s.game_results_id === null && (s.usa_player_id === null || s.ussr_player_id === null))
       .map(s => {
@@ -1498,6 +1507,7 @@ console.log("scheduleParsed", scheduleParsed);
       })
       .filter(Boolean);
 
+    // --- 6. Count fully-paired games per player (both sides filled) ---
     const playerGameCount = new Map<string, number>();
     for (const player of registrations) {
       if (player.users?.id) {
@@ -1513,6 +1523,7 @@ console.log("scheduleParsed", scheduleParsed);
       }
     }
 
+    // --- 7. Active players whose game count is below the target ---
     const activePlayers = registrations.filter(r => r.status !== 'forfeited' && r.users);
     const seenPlayerIds = new Set<string>();
     const playersBelowTarget: any[] = [];
@@ -1531,6 +1542,7 @@ console.log("scheduleParsed", scheduleParsed);
       }
     }
 
+    // --- 8. Deduplicated waitlist players (ordered by signup time) ---
     const seenWaitlistIds = new Set<string>();
     const waitlistPlayers: any[] = [];
     for (const entry of waitlistEntries) {
@@ -1543,6 +1555,32 @@ console.log("scheduleParsed", scheduleParsed);
       });
     }
 
+    // --- 9. Build adjacency map of who has already played whom, then expose it
+    //         for the players the UI needs to re-pair (below target or half-paired) ---
+    const opponentMap = new Map<string, Set<string>>();
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+      if (usaId && ussrId) {
+        if (!opponentMap.has(usaId)) opponentMap.set(usaId, new Set());
+        if (!opponentMap.has(ussrId)) opponentMap.set(ussrId, new Set());
+        opponentMap.get(usaId)!.add(ussrId);
+        opponentMap.get(ussrId)!.add(usaId);
+      }
+    }
+
+    const playersNeedingPairing = new Set<string>();
+    for (const p of playersBelowTarget) playersNeedingPairing.add(p.userId);
+    for (const s of schedulesWithoutPair) {
+      if (s) playersNeedingPairing.add(s.existingPlayer.userId);
+    }
+
+    const previousOpponents: Record<string, string[]> = {};
+    for (const playerId of playersNeedingPairing) {
+      const opponents = opponentMap.get(playerId);
+      previousOpponents[playerId] = opponents ? Array.from(opponents) : [];
+    }
+
     return {
       tournamentId: tournament.id.toString(),
       tournamentName: tournament.tournament_name,
@@ -1550,6 +1588,7 @@ console.log("scheduleParsed", scheduleParsed);
       schedulesWithoutPair,
       playersBelowTarget,
       waitlistPlayers,
+      previousOpponents,
       summary: {
         targetGamesPerPlayer,
         totalActivePlayers: seenPlayerIds.size,
