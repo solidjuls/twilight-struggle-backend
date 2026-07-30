@@ -37,6 +37,7 @@ export interface GetSchedulesQueryDto {
 }
 
 export interface CreateScheduleDto {
+  scheduleId?: number; // existing schedule ID — if present, updates instead of creating
   usa: string; // USA player ID
   ussr: string; // USSR player ID
   t: number; // tournament ID

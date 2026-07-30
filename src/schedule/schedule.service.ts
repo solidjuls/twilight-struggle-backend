@@ -355,6 +355,33 @@ export class ScheduleService {
     }
   }
 
+  async updateSchedulePlayers(
+    scheduleId: number,
+    usa: string,
+    ussr: string,
+    t: number,
+    d: Date,
+    gc: string,
+    randomSides?: boolean,
+  ): Promise<ScheduleUpdateResult> {
+    const updated = await this.databaseService.schedule.update({
+      where: { id: scheduleId },
+      data: {
+        tournaments_id: t,
+        game_code: gc,
+        usa_player_id: BigInt(usa),
+        ussr_player_id: BigInt(ussr),
+        due_date: d,
+        random_sides: randomSides,
+      },
+    });
+    return {
+      ...updated,
+      usa_player_id: updated.usa_player_id?.toString(),
+      ussr_player_id: updated.ussr_player_id?.toString(),
+    };
+  }
+
   async replaceSchedulePlayers(
     oldPlayer: string,
     newPlayer: string,
