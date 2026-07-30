@@ -49,6 +49,7 @@ export class ScheduleController {
         page = '1',
         pageSize = '20',
         onlyPending,
+        noOpponent,
         orderBy = 'dueDate',
         orderDirection = 'asc',
         a = '0',
@@ -142,6 +143,7 @@ export class ScheduleController {
         page: parsedPage,
         pageSize: parsedPageSize,
         adminView,
+        noOpponent,
         onlyPending: parsedOnlyPending,
         orderBy: finalOrderBy,
         orderDirection: finalOrderDirection,
@@ -169,6 +171,33 @@ export class ScheduleController {
       );
     }
   }
+
+    @Get('players-with-missing-games')
+    async playersWithMissingGames(
+      @Query() query: any,
+      @CurrentUser() user: JwtPayloadDto,
+    ) {
+      try {
+        const { tid } = query;
+        const id = parseInt(tid);
+        console.log("tournamentId", id, tid, query);
+  
+        // const targetGames = body.targetGamesPerPlayer || 20;
+        const result = await this.scheduleService.getPlayersWithMissingGames(id, 20);
+  
+        return {
+          success: true,
+          message: 'Missing schedule pairs created',
+          ...result
+        };
+      } catch (error) {
+        console.error("CREATE MISSING PAIRS API Error:", error);
+        throw new HttpException(
+          error.message || 'Failed to create missing pairs',
+          error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
 
   @Post()
   async updateScheduleOrSubmit(
@@ -206,6 +235,14 @@ export class ScheduleController {
     try {
       const { usa, ussr, t, d, gc, randomSides } = body.data;
 
+      const children = await this.tournamentsService.getChildTournaments([Number(t)]);
+      if (children.length > 0) {
+        throw new HttpException(
+          'This tournament has playoffs running. Add the schedule on the correct playoff tab',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
       const updated = await this.scheduleService.addSchedulePlayers(
         usa,
         ussr,
@@ -219,6 +256,55 @@ export class ScheduleController {
       return updated;
     } catch (error) {
       console.error('[Schedule PUT]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Put('create-schedules-bulk')
+  async addSchedulesBulk(@Body() body: { data: CreateScheduleDto[] }) {
+    const results: any[] = [];
+    try {
+      for (const item of body.data) {
+        const { scheduleId, usa, ussr, t, d, gc, randomSides } = item;
+
+        const children = await this.tournamentsService.getChildTournaments([Number(t)]);
+        if (children.length > 0) {
+          throw new HttpException(
+            'This tournament has playoffs running. Add the schedule on the correct playoff tab',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (scheduleId) {
+          const updated = await this.scheduleService.updateSchedulePlayers(
+            scheduleId,
+            usa,
+            ussr,
+            Number(t),
+            new Date(d),
+            gc,
+            randomSides,
+          );
+          results.push(updated);
+        } else {
+          const updated = await this.scheduleService.addSchedulePlayers(
+            usa,
+            ussr,
+            Number(t),
+            new Date(d),
+            gc,
+            null,
+            randomSides,
+          );
+          results.push(updated);
+        }
+      }
+      return results;
+    } catch (error) {
+      console.error('[Schedule PUT bulk]', error);
       throw new HttpException(
         'Internal Server Error',
         HttpStatus.INTERNAL_SERVER_ERROR,

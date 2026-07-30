@@ -21,6 +21,7 @@ export class ScheduleService {
     pageSize,
     adminView,
     onlyPending,
+    noOpponent,
     orderBy,
     orderDirection
   }: {
@@ -30,6 +31,7 @@ export class ScheduleService {
     pageSize: number;
     adminView: boolean;
     onlyPending?: boolean;
+    noOpponent?: boolean;
     orderBy?: string;
     orderDirection?: string;
   }): Promise<ScheduleListResponse> {
@@ -62,6 +64,15 @@ export class ScheduleService {
         game_results_id: null
       });
     // }
+
+    if (noOpponent) {
+      where.AND.push({
+        OR: [
+          { usa_player_id: null },
+          { ussr_player_id: null },
+        ],
+      });
+    }
 
     // Build dynamic orderBy based on parameters
     const prismaOrderBy: any = [];
@@ -315,6 +326,17 @@ export class ScheduleService {
     bo: number | null,
     randomSides?: boolean,
   ): Promise<ScheduleUpdateResult> {
+    // check the schedule does not exist already
+    const existingSchedule = await this.databaseService.schedule.findFirst({
+      where: {
+        tournaments_id: t,
+        usa_player_id: BigInt(usa),
+        ussr_player_id: BigInt(ussr),
+      }
+    });
+    if (existingSchedule) {
+      throw new Error('Schedule already exists');
+    } 
     const schedule = await this.databaseService.schedule.create({
       data: {
         tournaments_id: t,
@@ -331,6 +353,33 @@ export class ScheduleService {
       usa_player_id: schedule.usa_player_id?.toString(),
       ussr_player_id: schedule.ussr_player_id?.toString(),
     }
+  }
+
+  async updateSchedulePlayers(
+    scheduleId: number,
+    usa: string,
+    ussr: string,
+    t: number,
+    d: Date,
+    gc: string,
+    randomSides?: boolean,
+  ): Promise<ScheduleUpdateResult> {
+    const updated = await this.databaseService.schedule.update({
+      where: { id: scheduleId },
+      data: {
+        tournaments_id: t,
+        game_code: gc,
+        usa_player_id: BigInt(usa),
+        ussr_player_id: BigInt(ussr),
+        due_date: d,
+        random_sides: randomSides,
+      },
+    });
+    return {
+      ...updated,
+      usa_player_id: updated.usa_player_id?.toString(),
+      ussr_player_id: updated.ussr_player_id?.toString(),
+    };
   }
 
   async replaceSchedulePlayers(
@@ -437,5 +486,236 @@ export class ScheduleService {
     });
 
     return { success: true };
+  }
+
+  findFullNameById(id: bigint, registeredPlayers: any[]) {
+    const player = registeredPlayers.find(p => p.users.id === id);
+    return player ? `${player.users.first_name} ${player.users.last_name}` : 'Unknown Player';
+  }
+
+  async getPlayersWithMissingGames(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    // 1. Get all registered players for the tournament
+    // het first nameand last name from users table
+    const registeredPlayers = await this.databaseService.tournament_registration.findMany({
+      select: {
+        status: true,
+        users: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+          }
+        },
+      },
+      where: { tournamentId },
+    });
+
+    if (registeredPlayers.length < 2) {
+      throw new Error('Not enough registered players');
+    }
+
+    // 2. Get current schedule counts for each player
+    const schedules = await this.databaseService.schedule.findMany({
+      where: {
+        tournaments_id: tournamentId,
+      },
+      select: {
+        id: true,
+        usa_player_id: true,
+        ussr_player_id: true,
+        game_results_id: true,
+        game_code: true,
+      }
+    });
+
+    // find the registered players with status forfeited
+    const forfeitedPlayers = registeredPlayers.filter(p => p.status === 'forfeited');
+    const activePlayers = registeredPlayers.filter(p => p.status !== 'forfeited');
+
+    // find players ids who have not a single schedule comparing schedules with registeredplayers
+    const playersWithoutSchedule = registeredPlayers.filter(p => {
+      return !schedules.find(sch => sch.usa_player_id === p.users.id || sch.ussr_player_id === p.users.id);
+    });
+
+    // set to null the ids from schedules locally where the player is in the forfeitedPlayers array
+    const schedulesWithMissingOpponent: Array<{
+      id: number;
+      existingPlayerId: bigint;
+      isUSA: boolean;
+    }> = [];
+    const playerGameCount = new Map<string, number>();
+
+    for (const player of registeredPlayers) {
+      playerGameCount.set(player.users.id.toString(), 0);
+    }
+
+    for (const player of forfeitedPlayers) { 
+      for (let schedule of schedules) {
+        if (schedule.game_results_id !== null) continue;
+
+        if (schedule.usa_player_id === player.users.id) {
+          schedule.usa_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.usa_player_id,
+            isUSA: true
+          });
+        }
+        if (schedule.ussr_player_id === player.users.id) {
+          schedule.ussr_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.ussr_player_id,
+            isUSA: false
+          });
+        }
+      }
+    }
+
+    const gameCodes: string[] = []
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+
+      // hack to compensate for DDB errors leading to inconsistent shcedule data
+      if (schedule.game_results_id !== null && ((!usaId && ussrId) || (usaId && !ussrId))) {
+        if (usaId) {
+          playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+        }
+        if (ussrId) {
+          playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+        }
+      }
+
+      if (ussrId && usaId && playerGameCount.has(usaId)) {
+        playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+      }
+      if (ussrId && usaId && playerGameCount.has(ussrId)) {
+        playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+      }
+
+      if (schedule.game_results_id === null && ((!usaId && ussrId) || (usaId && !ussrId))) {
+        !gameCodes.includes(schedule.game_code) && gameCodes.push(schedule.game_code);
+      }
+    }
+
+    // 3. Get ratings for all players
+    const playerRatings = new Map<string, number>();
+    for (const player of activePlayers) {
+      const ratingRecord = await this.databaseService.ratings_history.findFirst({
+        where: { player_id: player.users.id },
+        orderBy: { created_at: 'desc' },
+        select: { rating: true }  
+      });
+      playerRatings.set(player.users.id.toString(), ratingRecord?.rating || 1500);
+    }
+
+    // 4. Find players who need more games
+    const playersNeedingGames: Array<{ id: bigint; fullName: string; gamesNeeded: number; rating: number }> = [];
+    for (const player of activePlayers) {
+      const currentGames = playerGameCount.get(player.users.id.toString()) || 0;
+      if (currentGames < targetGamesPerPlayer) {
+        playersNeedingGames.push({
+          id: player.users.id,
+          fullName: this.findFullNameById(player.users.id, registeredPlayers),
+          gamesNeeded: targetGamesPerPlayer - currentGames,
+          rating: playerRatings.get(player.users.id.toString()) || 1500
+        });
+      }
+    }
+
+    // Sort by rating for pairing
+    playersNeedingGames.sort((a, b) => a.rating - b.rating);
+
+    // remove Otto Wefer from playersNeedingGames if he exists
+    const playersNeedingGamesFiltered = playersNeedingGames// .filter(p => p.fullName !== 'Otto Wefer' || 'Alejandro Granese');
+
+    const suggestedPairings = []
+    // 5. Suggest pairings
+    for (const player of playersNeedingGamesFiltered) {
+      // if player exists in suggestedPairings, skip
+        if (suggestedPairings.find(p => p.player1 === player.fullName || p.player2 === player.fullName)) continue;
+
+      for (const otherPlayer of playersNeedingGamesFiltered) {
+        if (player.id === otherPlayer.id) continue;
+        if (suggestedPairings.find(p => p.player1 === otherPlayer.fullName || p.player2 === otherPlayer.fullName)) continue;
+
+        const existingSchedule = await this.databaseService.schedule.findFirst({
+          where: {
+            tournaments_id: 318,
+            OR: [
+              {
+                usa_player_id: BigInt(player.id),
+                ussr_player_id: BigInt(otherPlayer.id),
+              },
+              {
+                usa_player_id: BigInt(otherPlayer.id),
+                ussr_player_id: BigInt(player.id),
+              },
+            ],
+          },
+        });
+        
+        if (!existingSchedule) {
+          suggestedPairings.push({
+            player1: player.fullName,
+            player2: otherPlayer.fullName,
+          });
+          // console.log(`SUGGESTED PAIRING: ${player.fullName} vs ${otherPlayer.fullName}`);
+          break;
+        }
+
+      }
+    }
+
+    let schedulesUpdated = 0;
+    let schedulesCreated = 0;
+    const errors: string[] = [];
+    console.log("suggestedPairings", suggestedPairings);
+     console.log("gameCodes", gameCodes);
+
+    // create a schedule for each suggested pairing, the game code should be random 4 char string, starting by J
+    for (const pairing of suggestedPairings) {
+      const gameCode = `J${Math.random().toString(36).substring(2, 6)}`;
+      const usaPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player1);
+      const ussrPlayer = playersNeedingGamesFiltered.find(p => p.fullName === pairing.player2);
+      // date Apr 1st
+      const dueDate = new Date('2025-04-02');
+      // await this.databaseService.schedule.create({
+      //   data: {
+      //     tournaments_id: 318,
+      //     game_code: gameCode,
+      //     usa_player_id: BigInt(usaPlayer.id),
+      //     ussr_player_id: BigInt(ussrPlayer.id),
+      //     due_date: dueDate,
+      //   }
+      // });
+      schedulesCreated++;
+    }
+   
+ console.log("schedulesCreated", schedulesCreated, playersNeedingGamesFiltered);
+      // remove all schedules with the game code in the array, except 'Otto Wefer'
+    const scheduleIds = await this.databaseService.schedule.findMany({
+      where: {
+        game_code: {
+          in: gameCodes,
+        },
+        tournaments_id: 318,
+      },
+      select: {
+        id: true,
+      }
+    });
+
+    const filteredScheduleIds = scheduleIds.filter(s => s.id !== 8947);
+  console.log("scheduleIds", filteredScheduleIds);
+    // const deleted = await this.databaseService.schedule.deleteMany({
+    //   where: {
+    //     id: {
+    //       in: filteredScheduleIds.map(s => s.id),
+    //     }
+    //   },
+    // });
+    // console.log("deleted", deleted);
   }
 }

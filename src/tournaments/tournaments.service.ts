@@ -631,15 +631,45 @@ console.log("scheduleParsed", scheduleParsed);
   }
 
   async forfeitPlayer(tournamentId: number, registrationId: number): Promise<any> {
-    return await this.databaseService.tournament_registration.update({
-      where: {
-        id: registrationId,
-        tournamentId: tournamentId,
-      },
-      data: {
-        status: 'forfeited',
-        updated_at: new Date(),
-      }
+    const registration = await this.databaseService.tournament_registration.findUnique({
+      where: { id: registrationId, tournamentId },
+      select: { userId: true },
+    });
+
+    if (!registration?.userId) {
+      throw new Error('Registration not found or has no associated user');
+    }
+
+    const userId = registration.userId;
+
+    return await this.databaseService.$transaction(async (tx) => {
+      const updated = await tx.tournament_registration.update({
+        where: { id: registrationId, tournamentId },
+        data: {
+          status: 'forfeited',
+          updated_at: new Date(),
+        }
+      });
+
+      await tx.schedule.updateMany({
+        where: {
+          tournaments_id: tournamentId,
+          game_results_id: null,
+          usa_player_id: userId,
+        },
+        data: { usa_player_id: null },
+      });
+
+      await tx.schedule.updateMany({
+        where: {
+          tournaments_id: tournamentId,
+          game_results_id: null,
+          ussr_player_id: userId,
+        },
+        data: { ussr_player_id: null },
+      });
+
+      return updated;
     });
   }
 
@@ -1359,4 +1389,464 @@ console.log("scheduleParsed", scheduleParsed);
     }));
   }
 
+  // Builds the full dataset the admin UI needs to review and fix tournament scheduling.
+  // Returns: forfeited players, half-paired schedule slots, players under the game target,
+  // waitlist entries, and a previous-opponents map so the UI can avoid duplicate matchups.
+  async getScheduleAdminData(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    // --- 1. Resolve tournament scope (parent + all children) ---
+    const tournament = await this.databaseService.tournaments.findUnique({
+      where: { id: tournamentId },
+      select: { id: true, tournament_name: true },
+    });
+
+    if (!tournament) {
+      throw new Error('Tournament not found');
+    }
+
+    const childTournaments = await this.getChildTournaments([tournamentId]);
+    const allTournamentIds = [tournamentId, ...childTournaments.map(c => c.id)];
+
+    // --- 2. Fetch registrations, schedules, and waitlist in parallel ---
+    const [registrations, schedules, waitlistEntries] = await Promise.all([
+      this.databaseService.tournament_registration.findMany({
+        where: { tournamentId: { in: allTournamentIds } },
+        select: {
+          status: true,
+          users: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              countries: { select: { tld_code: true } },
+            },
+          },
+        },
+      }),
+      this.databaseService.schedule.findMany({
+        where: { tournaments_id: { in: allTournamentIds } },
+        select: {
+          id: true,
+          game_code: true,
+          usa_player_id: true,
+          ussr_player_id: true,
+          due_date: true,
+          game_results_id: true,
+        },
+      }),
+      this.databaseService.tournament_waitlist.findMany({
+        where: { tournamentId: { in: allTournamentIds } },
+        select: {
+          userId: true,
+          created_at: true,
+          users: {
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              countries: { select: { tld_code: true } },
+            },
+          },
+        },
+        orderBy: { created_at: 'asc' },
+      }),
+    ]);
+
+    // --- 3. Resolve each player's latest rating (ratings_history is ordered desc, first wins) ---
+    const allPlayerIds = new Set<bigint>();
+    for (const reg of registrations) {
+      if (reg.users?.id) allPlayerIds.add(reg.users.id);
+    }
+    for (const entry of waitlistEntries) {
+      if (entry.users?.id) allPlayerIds.add(entry.users.id);
+    }
+
+    const allRatings = await this.databaseService.ratings_history.findMany({
+      where: { player_id: { in: Array.from(allPlayerIds) } },
+      orderBy: { created_at: 'desc' },
+      select: { player_id: true, rating: true },
+    });
+
+    const latestRatingByPlayer = new Map<string, number>();
+    for (const r of allRatings) {
+      const key = r.player_id.toString();
+      if (!latestRatingByPlayer.has(key)) {
+        latestRatingByPlayer.set(key, Number(r.rating));
+      }
+    }
+
+    // Helper: normalize a user row into the shape used across all output lists
+    const toPlayerInfo = (user: { id: bigint; first_name: string | null; last_name: string | null; countries: { tld_code: string } | null }) => ({
+      userId: user.id.toString(),
+      fullName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Unknown Player',
+      rating: latestRatingByPlayer.get(user.id.toString()) ?? null,
+      tldCode: user.countries?.tld_code ?? null,
+    });
+
+    // --- 4. Forfeited players (dropped out, excluded from active pairing) ---
+    const forfeitedPlayers = registrations
+      .filter(r => r.status === 'forfeited' && r.users)
+      .map(r => toPlayerInfo(r.users));
+
+    // --- 5. Schedule slots missing one side (no results yet and one of USA/USSR is null) ---
+    const schedulesWithoutPair = schedules
+      .filter(s => s.game_results_id === null && (s.usa_player_id === null || s.ussr_player_id === null))
+      .map(s => {
+        const hasUsa = s.usa_player_id !== null;
+        const existingPlayerId = hasUsa ? s.usa_player_id : s.ussr_player_id;
+        const existingReg = registrations.find(r => r.users?.id === existingPlayerId);
+        if (!existingReg?.users) return null;
+        return {
+          scheduleId: s.id.toString(),
+          gameCode: s.game_code,
+          dueDate: s.due_date.toISOString(),
+          existingPlayer: {
+            ...toPlayerInfo(existingReg.users),
+            side: hasUsa ? 'usa' : 'ussr',
+          },
+        };
+      })
+      .filter(Boolean);
+
+    // --- 6. Count fully-paired games per player (both sides filled) ---
+    const playerGameCount = new Map<string, number>();
+    for (const player of registrations) {
+      if (player.users?.id) {
+        playerGameCount.set(player.users.id.toString(), 0);
+      }
+    }
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+      if (usaId && ussrId) {
+        if (playerGameCount.has(usaId)) playerGameCount.set(usaId, playerGameCount.get(usaId) + 1);
+        if (playerGameCount.has(ussrId)) playerGameCount.set(ussrId, playerGameCount.get(ussrId) + 1);
+      }
+    }
+
+    // --- 7. Active players whose game count is below the target ---
+    const activePlayers = registrations.filter(r => r.status !== 'forfeited' && r.users);
+    const seenPlayerIds = new Set<string>();
+    const playersBelowTarget: any[] = [];
+    for (const player of activePlayers) {
+      const idStr = player.users.id.toString();
+      if (seenPlayerIds.has(idStr)) continue;
+      seenPlayerIds.add(idStr);
+
+      const currentGames = playerGameCount.get(idStr) || 0;
+      if (currentGames < targetGamesPerPlayer) {
+        playersBelowTarget.push({
+          ...toPlayerInfo(player.users),
+          currentGames,
+          gamesNeeded: targetGamesPerPlayer - currentGames,
+        });
+      }
+    }
+
+    // --- 8. Deduplicated waitlist players (ordered by signup time) ---
+    const seenWaitlistIds = new Set<string>();
+    const waitlistPlayers: any[] = [];
+    for (const entry of waitlistEntries) {
+      const idStr = entry.users.id.toString();
+      if (seenWaitlistIds.has(idStr)) continue;
+      seenWaitlistIds.add(idStr);
+      waitlistPlayers.push({
+        ...toPlayerInfo(entry.users),
+        waitlistedAt: entry.created_at?.toISOString() ?? null,
+      });
+    }
+
+    // --- 9. Build adjacency map of who has already played whom, then expose it
+    //         for the players the UI needs to re-pair (below target or half-paired) ---
+    const opponentMap = new Map<string, Set<string>>();
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+      if (usaId && ussrId) {
+        if (!opponentMap.has(usaId)) opponentMap.set(usaId, new Set());
+        if (!opponentMap.has(ussrId)) opponentMap.set(ussrId, new Set());
+        opponentMap.get(usaId)!.add(ussrId);
+        opponentMap.get(ussrId)!.add(usaId);
+      }
+    }
+
+    const playersNeedingPairing = new Set<string>();
+    for (const p of playersBelowTarget) playersNeedingPairing.add(p.userId);
+    for (const s of schedulesWithoutPair) {
+      if (s) playersNeedingPairing.add(s.existingPlayer.userId);
+    }
+
+    const previousOpponents: Record<string, string[]> = {};
+    for (const playerId of playersNeedingPairing) {
+      const opponents = opponentMap.get(playerId);
+      previousOpponents[playerId] = opponents ? Array.from(opponents) : [];
+    }
+
+    return {
+      tournamentId: tournament.id.toString(),
+      tournamentName: tournament.tournament_name,
+      forfeitedPlayers,
+      schedulesWithoutPair,
+      playersBelowTarget,
+      waitlistPlayers,
+      previousOpponents,
+      summary: {
+        targetGamesPerPlayer,
+        totalActivePlayers: seenPlayerIds.size,
+        totalForfeitedPlayers: forfeitedPlayers.length,
+        totalSchedulesWithoutPair: schedulesWithoutPair.length,
+        totalPlayersBelowTarget: playersBelowTarget.length,
+        totalWaitlistPlayers: waitlistPlayers.length,
+      },
+    };
+  }
+
+  findFullNameById(id: bigint, registeredPlayers: any[]) {
+    const player = registeredPlayers.find(p => p.users.id === id);
+    return player ? `${player.users.first_name} ${player.users.last_name}` : 'Unknown Player';
+  }
+  async createMissingSchedulePairs(tournamentId: number, targetGamesPerPlayer: number = 20): Promise<any> {
+    // 1. Get all registered players for the tournament
+    // het first nameand last name from users table
+    const registeredPlayers = await this.databaseService.tournament_registration.findMany({
+      select: {
+        status: true,
+        users: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+          }
+        },
+      },
+      where: { tournamentId },
+    });
+
+    if (registeredPlayers.length < 2) {
+      throw new Error('Not enough registered players');
+    }
+
+    // 2. Get current schedule counts for each player
+    const schedules = await this.databaseService.schedule.findMany({
+      where: {
+        tournaments_id: tournamentId,
+      },
+      select: {
+        id: true,
+        usa_player_id: true,
+        ussr_player_id: true,
+        game_results_id: true,
+      }
+    });
+
+    //|| [2835,1789,2241,3141,2589,2743,2344,2084,1862,2489,2985,2859,2089].includes(Number(p.users.id)) 
+    // find the registered players with status forfeited
+    const forfeitedPlayers = registeredPlayers.filter(p => p.status === 'forfeited');
+    const activePlayers = registeredPlayers.filter(p => p.status !== 'forfeited');
+console.log("forfeitedPlayers", forfeitedPlayers);
+    // find players ids who have not a single schedule comparing schedules with registeredplayers
+    const playersWithoutSchedule = registeredPlayers.filter(p => {
+      return !schedules.find(sch => sch.usa_player_id === p.users.id || sch.ussr_player_id === p.users.id);
+    });
+
+    // set to null the ids from schedules locally where the player is in the forfeitedPlayers array
+    const schedulesWithMissingOpponent: Array<{
+      id: number;
+      existingPlayerId: bigint;
+      isUSA: boolean;
+    }> = [];
+    const playerGameCount = new Map<string, number>();
+
+    for (const player of registeredPlayers) {
+      playerGameCount.set(player.users.id.toString(), 0);
+    }
+
+    for (const player of forfeitedPlayers) { 
+      for (let schedule of schedules) {
+        if (schedule.game_results_id !== null) continue;
+
+        if (schedule.usa_player_id === player.users.id) {
+          schedule.usa_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.usa_player_id,
+            isUSA: true
+          });
+        }
+        if (schedule.ussr_player_id === player.users.id) {
+          schedule.ussr_player_id = null;
+          schedulesWithMissingOpponent.push({
+            id: schedule.id,
+            existingPlayerId: schedule.ussr_player_id,
+            isUSA: false
+          });
+        }
+      }
+    }
+
+
+    for (const schedule of schedules) {
+      const usaId = schedule.usa_player_id?.toString();
+      const ussrId = schedule.ussr_player_id?.toString();
+
+      if (ussrId && usaId && playerGameCount.has(usaId)) {
+        playerGameCount.set(usaId, (playerGameCount.get(usaId) || 0) + 1);
+      }
+      if (ussrId && usaId && playerGameCount.has(ussrId)) {
+        playerGameCount.set(ussrId, (playerGameCount.get(ussrId) || 0) + 1);
+      }
+    }
+
+    // 3. Get ratings for all players
+    const playerRatings = new Map<string, number>();
+    for (const player of activePlayers) {
+      const ratingRecord = await this.databaseService.ratings_history.findFirst({
+        where: { player_id: player.users.id },
+        orderBy: { created_at: 'desc' },
+        select: { rating: true }  
+      });
+      playerRatings.set(player.users.id.toString(), ratingRecord?.rating || 1500);
+    }
+
+    // 4. Find players who need more games
+    const playersNeedingGames: Array<{ id: bigint; fullName: string; gamesNeeded: number; rating: number }> = [];
+    for (const player of activePlayers) {
+      const currentGames = playerGameCount.get(player.users.id.toString()) || 0;
+      if (currentGames < targetGamesPerPlayer) {
+        playersNeedingGames.push({
+          id: player.users.id,
+          fullName: this.findFullNameById(player.users.id, registeredPlayers),
+          gamesNeeded: targetGamesPerPlayer - currentGames,
+          rating: playerRatings.get(player.users.id.toString()) || 1500
+        });
+      }
+    }
+
+    // Sort by rating for pairing
+    playersNeedingGames.sort((a, b) => a.rating - b.rating);
+
+    let schedulesUpdated = 0;
+    let schedulesCreated = 0;
+    const errors: string[] = [];
+    // console.log("playersNeedingGames", playersNeedingGames);
+    // 5. First, fill schedules with missing opponents
+    for (const schedule of schedulesWithMissingOpponent) {
+      const existingPlayerIdStr = schedule.existingPlayerId.toString();
+      const existingPlayerRating = playerRatings.get(existingPlayerIdStr) || 1500;
+
+      // Find the best match (closest rating) who still needs games
+      let bestMatch: { id: bigint; gamesNeeded: number; rating: number } | null = null;
+      let bestRatingDiff = Infinity;
+
+      for (const candidate of playersNeedingGames) {
+        if (candidate.id.toString() === existingPlayerIdStr) continue;
+        if (candidate.gamesNeeded <= 0) continue;
+
+        const ratingDiff = Math.abs(candidate.rating - existingPlayerRating);
+        if (ratingDiff < bestRatingDiff) {
+          bestRatingDiff = ratingDiff;
+          bestMatch = candidate;
+        }
+      }
+
+      if (bestMatch) {
+        try {
+          await this.databaseService.schedule.update({
+            where: { id: schedule.id },
+            data: schedule.isUSA
+              ? { ussr_player_id: bestMatch.id }
+              : { usa_player_id: bestMatch.id }
+          });
+          bestMatch.gamesNeeded--;
+          schedulesUpdated++;
+        } catch (error) {
+          errors.push(`Failed to update schedule ${schedule.id}: ${error.message}`);
+        }
+      }
+    }
+
+    // 6. Create new schedules for remaining players who need games
+    // Pair players with similar ratings
+    const stillNeedingGames = playersNeedingGames.filter(p => p.gamesNeeded > 0);
+
+    // Get existing pairs to avoid duplicates
+    const existingPairs = new Set<string>();
+    for (const schedule of schedules) {
+      if (schedule.usa_player_id && schedule.ussr_player_id) {
+        const pair1 = `${schedule.usa_player_id}-${schedule.ussr_player_id}`;
+        const pair2 = `${schedule.ussr_player_id}-${schedule.usa_player_id}`;
+        existingPairs.add(pair1);
+        existingPairs.add(pair2);
+      }
+    }
+
+    const now = new Date();
+    let pairIndex = 0;
+
+    while (stillNeedingGames.some(p => p.gamesNeeded > 0)) {
+      // Find two players who need games and haven't been paired
+      let paired = false;
+
+      for (let i = 0; i < stillNeedingGames.length && !paired; i++) {
+        const player1 = stillNeedingGames[i];
+        if (player1.gamesNeeded <= 0) continue;
+
+        // Find closest rating match
+        let bestMatch: typeof player1 | null = null;
+        let bestRatingDiff = Infinity;
+
+        for (let j = 0; j < stillNeedingGames.length; j++) {
+          if (i === j) continue;
+          const player2 = stillNeedingGames[j];
+          if (player2.gamesNeeded <= 0) continue;
+
+          const pairKey = `${player1.id}-${player2.id}`;
+          if (existingPairs.has(pairKey)) continue;
+
+          const ratingDiff = Math.abs(player1.rating - player2.rating);
+          if (ratingDiff < bestRatingDiff) {
+            bestRatingDiff = ratingDiff;
+            bestMatch = player2;
+          }
+        }
+
+        if (bestMatch) {
+          try {
+            const dueDate = new Date(now);
+            dueDate.setDate(dueDate.getDate() + Math.floor(Math.random() * 30) + 1);
+
+            await this.databaseService.schedule.create({
+              data: {
+                tournaments_id: tournamentId,
+                game_code: `PAIR_${tournamentId}_${Date.now()}_${pairIndex++}`,
+                usa_player_id: player1.id,
+                ussr_player_id: bestMatch.id,
+                due_date: dueDate,
+              }
+            });
+
+            player1.gamesNeeded--;
+            bestMatch.gamesNeeded--;
+            existingPairs.add(`${player1.id}-${bestMatch.id}`);
+            existingPairs.add(`${bestMatch.id}-${player1.id}`);
+            schedulesCreated++;
+            paired = true;
+          } catch (error) {
+            errors.push(`Failed to create schedule: ${error.message}`);
+          }
+        }
+      }
+
+      // If no pair was made, break to avoid infinite loop
+      if (!paired) break;
+    }
+
+    return {
+      totalPlayers: 0,// playerIds.length,
+      playersNeedingGames: playersNeedingGames.length,
+      schedulesWithMissingOpponent: schedulesWithMissingOpponent.length,
+      schedulesUpdated,
+      schedulesCreated,
+      errors: errors.slice(0, 20)
+    };
+  }
 }

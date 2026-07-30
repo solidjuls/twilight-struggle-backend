@@ -45,27 +45,12 @@ export class TournamentsController {
       const { id, status, players } = query;
       // Get registered players for a tournament
       if (typeof id === "string" && players === "true") {
-        const { players: registeredPlayers, isAdmin } = await this.tournamentsService.getRegisteredPlayers(
+        const { players: registeredPlayers } = await this.tournamentsService.getRegisteredPlayers(
           Number(id),
           user?.role,
           user?.id?.toString()
         );
-
-        if (!isAdmin) {
-          return registeredPlayers.map(player => ({ ...player, rating: null }));
-        }
-
-        // add the rating for each registered user
-        const registeredPlayersWithRating = await Promise.all(
-          registeredPlayers.map(async (player) => {
-            const rating = await this.userService.getUserRating(BigInt(player.userId));
-            return {
-              ...player,
-              rating
-            };
-          })
-        );
-        return registeredPlayersWithRating;
+        return registeredPlayers;
       }
 
       // Get tournaments by ID(s)
@@ -680,6 +665,37 @@ export class TournamentsController {
     }
   }
 
+  @Post('get-players-ratings')
+  async getPlayersRatings(@Body() body: { userIds: string[] }) {
+    try {
+      if (!body.userIds || !Array.isArray(body.userIds)) {
+        throw new HttpException('userIds array is required', HttpStatus.BAD_REQUEST);
+      }
+
+      const BATCH_SIZE = 10;
+      const ratings: { userId: string; rating: number | null }[] = [];
+
+      for (let i = 0; i < body.userIds.length; i += BATCH_SIZE) {
+        const batch = body.userIds.slice(i, i + BATCH_SIZE);
+        const batchResults = await Promise.all(
+          batch.map(async (userId) => {
+            const rating = await this.userService.getUserRating(BigInt(userId));
+            return { userId, rating: rating ?? null };
+          })
+        );
+        ratings.push(...batchResults);
+      }
+
+      return ratings;
+    } catch (error) {
+      console.error("GET PLAYERS RATINGS API Error:", error);
+      throw new HttpException(
+        error.message || 'Internal Server Error',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Get('health')
   getHealth() {
     return {
@@ -761,6 +777,82 @@ export class TournamentsController {
       throw new HttpException(
         error.message || 'Failed to create subtournament',
         HttpStatus.INTERNAL_SERVER_ERROR,
+      )
+    }
+  }
+  
+  // GET /api/tournaments/:id/schedule-admin - Get schedule admin data for tournament repair
+  @Get(':id/schedule-admin')
+  async getScheduleAdminData(
+    @Param('id') tournamentId: string,
+    @CurrentUser() user: JwtPayloadDto,
+    @Query('targetGamesPerPlayer') targetGamesPerPlayer?: string,
+  ) {
+    try {
+      const id = parseInt(tournamentId);
+      if (isNaN(id)) {
+        throw new HttpException('Invalid tournament ID', HttpStatus.BAD_REQUEST);
+      }
+
+      const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        id,
+      );
+
+      if (!isAdmin) {
+        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
+      }
+
+      const targetGames = targetGamesPerPlayer ? parseInt(targetGamesPerPlayer) : 20;
+      const result = await this.tournamentsService.getScheduleAdminData(id, targetGames);
+      return result;
+    } catch (error) {
+      console.error("SCHEDULE ADMIN GET API Error:", error);
+      throw new HttpException(
+        error.message || 'Failed to get schedule admin data',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  // POST /api/tournaments/:id/create-missing-pairs - Create missing schedule pairs based on rating
+  @Post(':id/create-missing-pairs')
+  async createMissingSchedulePairs(
+    @Param('id') tournamentId: string,
+    @Body() body: { targetGamesPerPlayer?: number },
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    try {
+      const id = parseInt(tournamentId);
+      if (isNaN(id)) {
+        throw new HttpException('Invalid tournament ID', HttpStatus.BAD_REQUEST);
+      }
+
+      // Check if user is admin for this tournament
+      const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+        user?.role,
+        user?.id?.toString(),
+        id
+      );
+
+      if (!isAdmin) {
+        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
+      }
+
+      const targetGames = body.targetGamesPerPlayer || 20;
+      const result = await this.tournamentsService.createMissingSchedulePairs(id, targetGames);
+
+      return {
+        success: true,
+        message: 'Missing schedule pairs created',
+        ...result
+      };
+    } catch (error) {
+      console.error("CREATE MISSING PAIRS API Error:", error);
+      throw new HttpException(
+        error.message || 'Failed to create missing pairs',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }

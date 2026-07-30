@@ -25,6 +25,7 @@ export interface GetSchedulesQueryDto {
   onlyPending?: string; // Filter only pending games (without results) - 'true' or 'false'
   orderBy?: 'dueDate' | 'gameDate' | 'tournamentName'; // Field to order by
   orderDirection?: 'asc' | 'desc'; // Order direction
+  noOpponent?: boolean; // Filter games where one of the players is null - 'true' or 'false'
 
   // Legacy parameters for backward compatibility
   uid?: string; // userId (legacy)
@@ -36,6 +37,7 @@ export interface GetSchedulesQueryDto {
 }
 
 export interface CreateScheduleDto {
+  scheduleId?: number; // existing schedule ID — if present, updates instead of creating
   usa: string; // USA player ID
   ussr: string; // USSR player ID
   t: number; // tournament ID
