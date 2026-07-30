@@ -263,6 +263,55 @@ export class ScheduleController {
     }
   }
 
+  @Put('create-schedules-bulk')
+  async addSchedulesBulk(@Body() body: { data: CreateScheduleDto[] }) {
+    const results: any[] = [];
+    try {
+      for (const item of body.data) {
+        const { scheduleId, usa, ussr, t, d, gc, randomSides } = item;
+
+        const children = await this.tournamentsService.getChildTournaments([Number(t)]);
+        if (children.length > 0) {
+          throw new HttpException(
+            'This tournament has playoffs running. Add the schedule on the correct playoff tab',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        if (scheduleId) {
+          const updated = await this.scheduleService.updateSchedulePlayers(
+            scheduleId,
+            usa,
+            ussr,
+            Number(t),
+            new Date(d),
+            gc,
+            randomSides,
+          );
+          results.push(updated);
+        } else {
+          const updated = await this.scheduleService.addSchedulePlayers(
+            usa,
+            ussr,
+            Number(t),
+            new Date(d),
+            gc,
+            null,
+            randomSides,
+          );
+          results.push(updated);
+        }
+      }
+      return results;
+    } catch (error) {
+      console.error('[Schedule PUT bulk]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Patch()
   async replaceOrDeletePlayer(
     @Body() body: { data: ReplacePlayersDto | DeletePlayerDto },
