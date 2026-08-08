@@ -126,6 +126,7 @@ model users {
   timezone_id                                     String?                   @db.VarChar(40)
   role_id                                         Int?
   banned                                          Boolean?
+  discord_user_id                                 BigInt?                   @db.UnsignedBigInt
   game_results_game_results_reporter_idTousers    game_results[]            @relation("game_results_reporter_idTousers")
   game_results_game_results_usa_player_idTousers  game_results[]            @relation("game_results_usa_player_idTousers")
   game_results_game_results_ussr_player_idTousers game_results[]            @relation("game_results_ussr_player_idTousers")
