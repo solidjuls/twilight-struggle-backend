@@ -295,11 +295,11 @@ export class UsersService {
     }
   }
 
-  async updateUser(userData: UpdateUserDto): Promise<{ success: boolean; error?: string }> {
+  async updateUser(userId: string, userData: UpdateUserDto): Promise<{ success: boolean; error?: string }> {
     try {
       await this.databaseService.users.update({
         where: {
-          email: userData.email,
+          id: BigInt(userId),
         },
         data: {
           first_name: userData.firstName,
@@ -321,7 +321,7 @@ export class UsersService {
     }
   }
 
-  async updatePassword(email: string, passwordData: UpdatePasswordDto): Promise<{ success: boolean; error?: string }> {
+  async updatePassword(userId: string, passwordData: UpdatePasswordDto): Promise<{ success: boolean; error?: string }> {
     try {
       const { currentPassword, newPassword, confirmPassword } = passwordData;
 
@@ -332,7 +332,7 @@ export class UsersService {
 
       // Get user with current password
       const user = await this.databaseService.users.findUnique({
-        where: { email },
+        where: { id: BigInt(userId) },
         select: { id: true, password: true },
       });
 
@@ -351,7 +351,7 @@ export class UsersService {
 
       // Update password
       await this.databaseService.users.update({
-        where: { email },
+        where: { id: BigInt(userId) },
         data: { password: hashedNewPassword },
       });
 

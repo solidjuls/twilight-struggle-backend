@@ -119,8 +119,8 @@ export class UsersController {
     @CurrentUser() user: JwtPayloadDto,
   ) {
     try {
-      const result = await this.usersService.updateUser(userData);
-      
+      const result = await this.usersService.updateUser(String(user.id), userData);
+
       if (!result.success) {
         throw new HttpException(
           result.error || 'Failed to update user',
@@ -183,7 +183,7 @@ export class UsersController {
     @CurrentUser() user: JwtPayloadDto,
   ) {
     try {
-      const result = await this.usersService.updatePassword(user.mail, passwordData);
+      const result = await this.usersService.updatePassword(String(user.id), passwordData);
 
       if (!result.success) {
         throw new HttpException(
