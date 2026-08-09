@@ -15,6 +15,7 @@ export interface UserDetailDto {
   last_name: string;
   playdek_name: string;
   email: string;
+  discord_user_id?: string;
   phone_number?: string;
   last_login_at?: string;
   preferred_gaming_platform?: string;
@@ -69,6 +70,7 @@ export interface UpdateUserDto {
   lastName?: string;
   playdek_name?: string;
   email: string;
+  discord_user_id?: string | null;
   phone?: string;
   preferredGamingPlatform?: string;
   preferredGameDuration?: string;

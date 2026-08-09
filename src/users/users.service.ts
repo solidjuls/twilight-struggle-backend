@@ -10,6 +10,22 @@ import {
   UpdatePasswordDto,
 } from './dto/users.dto';
 
+const DISCORD_USER_ID_PATTERN = /^\d{17,20}$/;
+
+export function parseDiscordUserId(value?: string | null): bigint | null | undefined {
+  if (value === undefined) return undefined;
+
+  const trimmed = value?.trim();
+
+  if (!trimmed) return null;
+
+  if (!DISCORD_USER_ID_PATTERN.test(trimmed)) {
+    throw new BadRequestException('Discord User ID must be 17 to 20 digits');
+  }
+
+  return BigInt(trimmed);
+}
+
 @Injectable()
 export class UsersService {
   constructor(private readonly databaseService: DatabaseService) {}
@@ -38,6 +54,7 @@ export class UsersService {
         last_name: true,
         playdek_name: true,
         email: true,
+        discord_user_id: true,
         phone_number: true,
         last_login_at: true,
         preferred_gaming_platform: true,
@@ -74,6 +91,7 @@ export class UsersService {
       last_name: user.last_name,
       playdek_name: user.playdek_name,
       email: user.email,
+      discord_user_id: user.discord_user_id?.toString(),
       phone_number: user.phone_number,
       last_login_at: user.last_login_at?.toISOString(),
       preferred_gaming_platform: user.preferred_gaming_platform,
@@ -296,6 +314,8 @@ export class UsersService {
   }
 
   async updateUser(userData: UpdateUserDto): Promise<{ success: boolean; error?: string }> {
+    const discordUserId = parseDiscordUserId(userData.discord_user_id);
+
     try {
       await this.databaseService.users.update({
         where: {
@@ -305,6 +325,7 @@ export class UsersService {
           first_name: userData.firstName,
           last_name: userData.lastName,
           playdek_name: userData.playdek_name,
+          discord_user_id: discordUserId,
           phone_number: userData.phone,
           last_login_at: new Date(),
           preferred_gaming_platform: userData.preferredGamingPlatform,
