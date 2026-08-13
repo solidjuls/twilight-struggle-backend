@@ -9,10 +9,10 @@
     "node": ">=18.x"
   },
   "scripts": {
-    "prebuild": "prisma generate --sql",
+    "prebuild": "prisma generate",
     "build": "nest build",
-    "postinstall": "prisma generate --sql",
-    "vercel-build": "prisma generate --sql && nest build",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -48,8 +48,10 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.10",
+    "@nestjs/testing": "^11.1.28",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
+    "@types/jest": "^30.0.0",
     "@types/node": "^24.7.2",
     "@types/passport-jwt": "^4.0.1",
     "nodemon": "^3.1.10",

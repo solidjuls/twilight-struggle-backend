@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { DatabaseService } from '../database/database.service';
 import { UsersService } from '../users/users.service';
 import { GameWinner } from '../games/dto/game.dto';
 import { PlayerRatingDto, PlayerRatingListResponse } from './dto/rating.dto';
-import { getTopNRatedPlayersWithFilter, getTopNRatedPlayers } from "@prisma/client/sql";
 
 const DEFAULT_RATING = 5000;
 const FRIENDLY_GAME = "47"
@@ -164,19 +164,80 @@ export class RatingService {
       let usersByCountry = []
 
       if (playerIds) {
-        // @ts-ignore
-        results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(playerIds?.join(','), pageSize, skip));
+        results = await this.databaseService.$queryRaw(Prisma.sql`
+          WITH ordered_player_ratings AS (
+            SELECT ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY rh.created_at DESC) desc_player_rating_count, rating, player_id
+            FROM ratings_history rh
+            INNER JOIN game_results gr ON gr.id = rh.game_result_id
+            WHERE gr.game_date > DATE_SUB(NOW(), INTERVAL 2 YEAR)
+          ), get_all_player_rankings AS (
+            SELECT users.id, first_name, last_name, last_login_at, tld_code, rating,
+              ROW_NUMBER() OVER (ORDER BY rating DESC) AS ranking, COUNT(*) OVER() as total_players
+            FROM users
+            LEFT JOIN ordered_player_ratings ON users.id = ordered_player_ratings.player_id
+            LEFT JOIN countries ON users.country_id = countries.id
+            WHERE (desc_player_rating_count = 1 OR desc_player_rating_count IS NULL)
+          )
+          SELECT *, TRUE AS is_truncated FROM get_all_player_rankings
+          WHERE FIND_IN_SET(id, ${playerIds.join(',')})
+          ORDER BY rating DESC LIMIT ${pageSize} OFFSET ${skip};
+        `);
       } else if (countryId) {
         usersByCountry = await this.usersService.getPlayerIdsByCountry(countryId);
-        // @ts-ignore
-        results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(usersByCountry?.join(','), pageSize, skip));
+        results = await this.databaseService.$queryRaw(Prisma.sql`
+          WITH ordered_player_ratings AS (
+            SELECT ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY rh.created_at DESC) desc_player_rating_count, rating, player_id
+            FROM ratings_history rh
+            INNER JOIN game_results gr ON gr.id = rh.game_result_id
+            WHERE gr.game_date > DATE_SUB(NOW(), INTERVAL 2 YEAR)
+          ), get_all_player_rankings AS (
+            SELECT users.id, first_name, last_name, last_login_at, tld_code, rating,
+              ROW_NUMBER() OVER (ORDER BY rating DESC) AS ranking, COUNT(*) OVER() as total_players
+            FROM users
+            LEFT JOIN ordered_player_ratings ON users.id = ordered_player_ratings.player_id
+            LEFT JOIN countries ON users.country_id = countries.id
+            WHERE (desc_player_rating_count = 1 OR desc_player_rating_count IS NULL)
+          )
+          SELECT *, TRUE AS is_truncated FROM get_all_player_rankings
+          WHERE FIND_IN_SET(id, ${usersByCountry.join(',')})
+          ORDER BY rating DESC LIMIT ${pageSize} OFFSET ${skip};
+        `);
       } else if(playdeckName) {
         const userId = await this.usersService.getPlayerIdByPlaydekName(playdeckName);
-        // @ts-ignore
-        results = await this.databaseService.$queryRaw(getTopNRatedPlayersWithFilter(userId, pageSize, skip));
+        results = await this.databaseService.$queryRaw(Prisma.sql`
+          WITH ordered_player_ratings AS (
+            SELECT ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY rh.created_at DESC) desc_player_rating_count, rating, player_id
+            FROM ratings_history rh
+            INNER JOIN game_results gr ON gr.id = rh.game_result_id
+            WHERE gr.game_date > DATE_SUB(NOW(), INTERVAL 2 YEAR)
+          ), get_all_player_rankings AS (
+            SELECT users.id, first_name, last_name, last_login_at, tld_code, rating,
+              ROW_NUMBER() OVER (ORDER BY rating DESC) AS ranking, COUNT(*) OVER() as total_players
+            FROM users
+            LEFT JOIN ordered_player_ratings ON users.id = ordered_player_ratings.player_id
+            LEFT JOIN countries ON users.country_id = countries.id
+            WHERE (desc_player_rating_count = 1 OR desc_player_rating_count IS NULL)
+          )
+          SELECT *, TRUE AS is_truncated FROM get_all_player_rankings
+          WHERE FIND_IN_SET(id, ${userId})
+          ORDER BY rating DESC LIMIT ${pageSize} OFFSET ${skip};
+        `);
       } else {
-        // @ts-ignore
-        results = await this.databaseService.$queryRaw(getTopNRatedPlayers(pageSize, skip));
+        results = await this.databaseService.$queryRaw(Prisma.sql`
+          WITH ordered_player_ratings AS (
+            SELECT ROW_NUMBER() OVER(PARTITION BY player_id ORDER BY rh.created_at DESC) desc_player_rating_count, rating, player_id
+            FROM ratings_history rh
+            INNER JOIN game_results gr ON gr.id = rh.game_result_id
+            WHERE gr.game_date > DATE_SUB(NOW(), INTERVAL 2 YEAR)
+          )
+          SELECT users.id, first_name, last_name, last_login_at, tld_code, rating,
+            ROW_NUMBER() OVER (ORDER BY rating DESC) AS ranking, COUNT(*) OVER() as total_players
+          FROM ordered_player_ratings
+          INNER JOIN users ON users.id = ordered_player_ratings.player_id
+          LEFT JOIN countries ON users.country_id = countries.id
+          WHERE desc_player_rating_count = 1
+          ORDER BY rating DESC LIMIT ${pageSize} OFFSET ${skip};
+        `);
       }
 
       const transformedResults: PlayerRatingDto[] = results.map((row) => ({
