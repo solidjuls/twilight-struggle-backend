@@ -4,6 +4,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
+  console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
+  console.log('DATABASE_URL length:', process.env.DATABASE_URL?.length);
+  console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 30));
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Configure body parser to handle large payloads (for CSV uploads)
@@ -20,6 +24,8 @@ async function bootstrap() {
 
   // Enable cookie parser for JWT authentication
   app.use(cookieParser());
+
+  console.log('DATABASE_URL set:', !!process.env.DATABASE_URL, process.env.DATABASE_URL);
 
   // Get allowed origins from environment variable or use defaults
   const allowedOrigins = process.env.CORS_ORIGINS
