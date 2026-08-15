@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
@@ -69,6 +70,17 @@ async function bootstrap() {
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
+
+  // Swagger UI (dev only, or when explicitly enabled)
+  if (process.env.ENABLE_SWAGGER === 'true' || process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Twilight Struggle API')
+      .setDescription('API contract for the Twilight Struggle backend')
+      .setVersion('1.0')
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.PORT || 4002;
   await app.listen(port);

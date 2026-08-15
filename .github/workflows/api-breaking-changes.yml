@@ -1,0 +1,211 @@
+name: API Version Check
+
+on:
+  pull_request:
+    branches: [main, gc-deploy]
+
+env:
+  APP_ENV: &app-env
+    DATABASE_URL: mysql://localhost:3306/dummy
+    SECRET: ci-placeholder
+    TOKEN_SECRET: ci-placeholder
+    JWT_SECRET: ci-placeholder
+    TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET: ci-placeholder
+    SMTP_HOST_RESET_PWD: ci-placeholder
+    SMTP_USER: ci-placeholder
+    SMTP_PWD: ci-placeholder
+    SMTP_USER_JUNTA: ci-placeholder
+    SMTP_PWD_JUNTA: ci-placeholder
+    SMTP_FROM: ci-placeholder
+    SMTP_FROM_JUNTA: ci-placeholder
+
+jobs:
+  check-api-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # --- Generate PR spec ---
+      - name: Install dependencies (PR)
+        run: yarn install --immutable
+
+      - name: Generate OpenAPI spec (PR)
+        run: yarn ts-node scripts/generate-spec.ts
+        env: *app-env
+        continue-on-error: true
+
+      - name: Save PR spec
+        run: |
+          if [ -f openapi.json ]; then
+            cp openapi.json /tmp/openapi-pr.json
+            echo "PR spec generated ✓"
+          else
+            echo "::warning::Could not generate OpenAPI spec from PR branch"
+            exit 0
+          fi
+
+      # --- Generate base spec ---
+      - name: Checkout base branch
+        run: git checkout ${{ github.event.pull_request.base.sha }}
+
+      - name: Install dependencies (base)
+        run: yarn install --immutable || true
+
+      - name: Generate OpenAPI spec (base)
+        run: yarn ts-node scripts/generate-spec.ts
+        env: *app-env
+        continue-on-error: true
+
+      - name: Save base spec
+        run: |
+          if [ -f openapi.json ]; then
+            cp openapi.json /tmp/openapi-base.json
+            echo "Base spec generated ✓"
+          else
+            echo "::warning::Could not generate OpenAPI spec from base branch"
+            exit 0
+          fi
+
+      # --- Compare & version bump ---
+      - name: Install oasdiff
+        run: |
+          curl -sL https://github.com/tufin/oasdiff/releases/latest/download/oasdiff_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz | tar xz -C /usr/local/bin oasdiff
+
+      - name: Read current version
+        id: current
+        run: |
+          git checkout ${{ github.head_ref }}
+          VERSION=$(node -e "console.log(require('./api-version.json').version)")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Detect API changes
+        id: diff
+        run: |
+          # Breaking changes → major bump
+          BREAKING=$(oasdiff breaking /tmp/openapi-base.json /tmp/openapi-pr.json 2>&1) || true
+
+          # All changes (changelog) → minor bump if any
+          CHANGES=$(oasdiff changelog /tmp/openapi-base.json /tmp/openapi-pr.json 2>&1) || true
+
+          # Determine bump type
+          BUMP="none"
+          if [ -n "$BREAKING" ]; then
+            BUMP="major"
+          elif [ -n "$CHANGES" ]; then
+            BUMP="minor"
+          fi
+
+          echo "bump=$BUMP" >> $GITHUB_OUTPUT
+
+          # Calculate new version
+          CURRENT="${{ steps.current.outputs.version }}"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          case $BUMP in
+            major) NEW_VERSION="$((MAJOR + 1)).0.0" ;;
+            minor) NEW_VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
+            *)     NEW_VERSION="$CURRENT" ;;
+          esac
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+          # Save reports for the comment step
+          echo "breaking_report<<REPORT_EOF" >> $GITHUB_OUTPUT
+          echo "$BREAKING" >> $GITHUB_OUTPUT
+          echo "REPORT_EOF" >> $GITHUB_OUTPUT
+
+          echo "changes_report<<REPORT_EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGES" >> $GITHUB_OUTPUT
+          echo "REPORT_EOF" >> $GITHUB_OUTPUT
+
+      - name: Post PR comment
+        if: steps.diff.outputs.bump != 'none' && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const bump = '${{ steps.diff.outputs.bump }}';
+            const current = '${{ steps.current.outputs.version }}';
+            const next = '${{ steps.diff.outputs.new_version }}';
+            const breaking = `${{ steps.diff.outputs.breaking_report }}`;
+            const changes = `${{ steps.diff.outputs.changes_report }}`;
+
+            const icon = bump === 'major' ? '🔴' : '🟡';
+            const label = bump === 'major' ? 'BREAKING' : 'non-breaking';
+
+            const sections = [
+              `## ${icon} API ${label} changes — \`${current}\` → \`${next}\``,
+              '',
+            ];
+
+            if (breaking) {
+              sections.push(
+                '### 🔴 Breaking changes',
+                '```',
+                breaking.substring(0, 30000),
+                '```',
+                '',
+              );
+            }
+
+            if (changes && bump === 'minor') {
+              sections.push(
+                '### 🟡 Additive changes',
+                '```',
+                changes.substring(0, 30000),
+                '```',
+                '',
+              );
+            }
+
+            sections.push(
+              '> The `api-version.json` will be updated automatically on merge.',
+            );
+
+            const body = sections.join('\n');
+
+            // Update existing comment or create new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.body.includes('API') && c.body.includes('changes —') && c.user.type === 'Bot'
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Summary
+        if: always()
+        run: |
+          BUMP="${{ steps.diff.outputs.bump }}"
+          CURRENT="${{ steps.current.outputs.version }}"
+          NEXT="${{ steps.diff.outputs.new_version }}"
+
+          if [ "$BUMP" = "none" ]; then
+            echo "✅ No API changes detected (v${CURRENT})"
+          else
+            echo "::notice::API ${BUMP} bump: v${CURRENT} → v${NEXT}"
+          fi
+
+      # NOTE: This workflow never fails the build. It only posts warnings.

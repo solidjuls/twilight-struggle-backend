@@ -1,9 +1,9 @@
-export interface StandingsQueryDto {
+export class StandingsQueryDto {
   id: string;
   division?: string;
 }
 
-export interface PlayerStandingDto {
+export class PlayerStandingDto {
   userId: string;
   name: string;
   secondaryName?: string;

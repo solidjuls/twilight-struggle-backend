@@ -1,4 +1,4 @@
-export interface ScheduleDto {
+export class ScheduleDto {
   id: string;
   gameWinner: string | null;
   gameDate: string | null;
@@ -17,7 +17,7 @@ export interface ScheduleDto {
   tournamentId: string;
 }
 
-export interface GetSchedulesQueryDto {
+export class GetSchedulesQueryDto {
   userId?: string; // User ID to filter schedules
   tournamentId?: string; // Tournament ID to filter schedules
   page?: string; // Page number for pagination
@@ -35,7 +35,7 @@ export interface GetSchedulesQueryDto {
   a?: string; // adminView (1 or 0) (legacy)
 }
 
-export interface CreateScheduleDto {
+export class CreateScheduleDto {
   usa: string; // USA player ID
   ussr: string; // USSR player ID
   t: number; // tournament ID
@@ -45,7 +45,7 @@ export interface CreateScheduleDto {
   randomSides?: boolean; // random sides
 }
 
-export interface CsvScheduleRow {
+export class CsvScheduleRow {
   due_date: string;
   game_code: string;
   usa_player_id: string;
@@ -53,12 +53,12 @@ export interface CsvScheduleRow {
   random?: 1 | 0
 }
 
-export interface UploadCsvScheduleDto {
+export class UploadCsvScheduleDto {
   file: CsvScheduleRow[];
   tournament: string;
 }
 
-export interface UpdateScheduleDto {
+export class UpdateScheduleDto {
   tournaments_id: number;
   game_code: string;
   usa_player_id: string | null;
@@ -68,18 +68,18 @@ export interface UpdateScheduleDto {
   id: number;
 }
 
-export interface ReplacePlayersDto {
+export class ReplacePlayersDto {
   pold: string; // old player ID
   pnew: string; // new player ID
   t: number; // tournament ID
 }
 
-export interface DeletePlayerDto {
+export class DeletePlayerDto {
   u: number; // user ID to delete
   t: number; // tournament ID
 }
 
-export interface ValidateScheduleDto {
+export class ValidateScheduleDto {
   usaPlayerId: number;
   id: number;
   ussrPlayerId: number;
@@ -87,12 +87,12 @@ export interface ValidateScheduleDto {
   tournamentId: number;
 }
 
-export interface ScheduleValidationResult {
+export class ScheduleValidationResult {
   game_results_id: bigint | null;
   id: number;
 }
 
-export interface ScheduleUpdateResult {
+export class ScheduleUpdateResult {
   id: number;
   tournaments_id: number;
   game_code: string;
@@ -105,7 +105,7 @@ export interface ScheduleUpdateResult {
   best_of: number | null;
 }
 
-export interface ScheduleListResponse {
+export class ScheduleListResponse {
   results: ScheduleDto[];
   totalRows: number;
   currentPage: number;

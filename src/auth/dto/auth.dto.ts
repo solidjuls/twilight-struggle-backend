@@ -1,20 +1,20 @@
-export interface LoginDto {
+export class LoginDto {
   mail: string;
   pwd: string;
 }
 
-export interface ImpersonateDto {
+export class ImpersonateDto {
   email: string;
 }
 
-export interface AuthResponseDto {
+export class AuthResponseDto {
   name: string;
   email: string;
   id: string;
   role: number;
 }
 
-export interface JwtPayloadDto {
+export class JwtPayloadDto {
   mail: string;
   name: string;
   role: number;
@@ -23,21 +23,21 @@ export interface JwtPayloadDto {
   exp?: number;
 }
 
-export interface UserFromTokenDto {
+export class UserFromTokenDto {
   id: number;
   playdek_name: string;
   mail: string;
   role: number;
 }
 
-export interface ResetPasswordDto {
+export class ResetPasswordDto {
   mail?: string;
   token?: string;
   pwd?: string;
   newPassword?: string;
 }
 
-export interface CreateUserDto {
+export class CreateUserDto {
   email: string;
   password: string;
   playdek_name: string;
@@ -46,7 +46,7 @@ export interface CreateUserDto {
   role_id?: number;
 }
 
-export interface RegisterUserDto {
+export class RegisterUserDto {
   email: string;
   password: string;
   confirmPassword: string;
@@ -60,7 +60,7 @@ export interface RegisterUserDto {
   preferredGameDuration?: string;
 }
 
-export interface RegisterUserResponse {
+export class RegisterUserResponse {
   success: boolean;
   message: string;
   user: {
@@ -71,15 +71,15 @@ export interface RegisterUserResponse {
   };
 }
 
-export interface EmailVerifyRequestDto {
+export class EmailVerifyRequestDto {
   email: string;
 }
 
-export interface EmailVerifyConfirmDto {
+export class EmailVerifyConfirmDto {
   token: string;
 }
 
-export interface EmailVerifyResponse {
+export class EmailVerifyResponse {
   success: boolean;
   message: string;
 }
