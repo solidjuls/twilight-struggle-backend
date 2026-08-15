@@ -1,4 +1,4 @@
-export interface PlayoffEntryDto {
+export class PlayoffEntryDto {
   id?: number;
   tournamentId: number;
   nextSquare: string;
@@ -7,7 +7,7 @@ export interface PlayoffEntryDto {
   seed: number;
 }
 
-export interface PlayoffBracketResponseDto {
+export class PlayoffBracketResponseDto {
   id: string;
   tournamentId: string;
   userId: number | null;
@@ -19,19 +19,19 @@ export interface PlayoffBracketResponseDto {
   winnerUserId: boolean;
 }
 
-export interface CreatePlayoffBracketResultDto {
+export class CreatePlayoffBracketResultDto {
   success: boolean;
   message: string;
   bracketEntriesCreated: number;
   schedulesCreated: number;
 }
 
-export interface PlayoffSummaryDto {
+export class PlayoffSummaryDto {
   id: number;
   name: string;
 }
 
-export interface CreatePlayoffScheduleDto {
+export class CreatePlayoffScheduleDto {
   usaPlayerId: string;
   ussrPlayerId: string;
   usaSeed: string;
@@ -44,25 +44,25 @@ export interface CreatePlayoffScheduleDto {
   bo: string;
 }
 
-export interface CreatePlayoffScheduleResultDto {
+export class CreatePlayoffScheduleResultDto {
   success: boolean;
   message: string;
   scheduleId?: number;
   emailSent?: boolean;
 }
 
-export interface UpdatePlayoffBracketResultDto {
+export class UpdatePlayoffBracketResultDto {
   success: boolean;
   message: string;
   updatedEntries: number;
 }
 
-export interface UpdatePlayoffWinnerDto {
+export class UpdatePlayoffWinnerDto {
   id: number;
   winnerUserId: boolean;
 }
 
-export interface UpdatePlayoffWinnerResultDto {
+export class UpdatePlayoffWinnerResultDto {
   success: boolean;
   message: string;
 }

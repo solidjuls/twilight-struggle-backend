@@ -1,8 +1,8 @@
-export interface CityDto {
+export class CityDto {
   id: string;
   name: string;
 }
 
-export interface GetCitiesQueryDto {
+export class GetCitiesQueryDto {
   q?: string; // Search query (minimum 3 characters)
 }

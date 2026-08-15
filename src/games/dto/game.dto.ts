@@ -1,15 +1,15 @@
-export interface GameRatingDto {
+export class GameRatingDto {
   rating: number;
   previousRating: number;
 }
 
-export interface GetGameChartQueryDto {
+export class GetGameChartQueryDto {
   type: 'winType';
   userId: string;
   fromDate: string;
 }
 
-export interface GameDto {
+export class GameDto {
   id: string;
   created_at: Date | null;
   updated_at: Date | null;
@@ -37,12 +37,12 @@ export interface GameDto {
 
 export type GameWinner = "1" | "2" | "3";
 
-export interface SeedType {
+export class SeedType {
   userId: bigint;
   seed: number;
 }
 
-export interface SubmitGameDto {
+export class SubmitGameDto {
   scheduleId?: string;
   gameWinner: GameWinner;
   gameCode: string;
@@ -54,7 +54,7 @@ export interface SubmitGameDto {
   video1?: string;
 }
 
-export interface RecreateGameDto {
+export class RecreateGameDto {
   oldId: string;
   gameDate: string;
   op: 'delete' | undefined;
@@ -69,11 +69,11 @@ export interface RecreateGameDto {
   scheduleId?: string;
 }
 
-export interface SubmitGameRequestDto {
+export class SubmitGameRequestDto {
   data: SubmitGameDto;
 }
 
-export interface GetGamesQueryDto {
+export class GetGamesQueryDto {
   id?: string;
   p?: string; // page
   pageSize?: string;
@@ -82,12 +82,12 @@ export interface GetGamesQueryDto {
   video?: string; // "true" to filter games with videos
 }
 
-export interface GameListResponse {
+export class GameListResponse {
   results: GameDto[];
   totalRows: number;
 }
 
-export interface CreateGameDto {
+export class CreateGameDto {
   usaPlayerId: string;
   ussrPlayerId: string;
   tournamentId: string;
@@ -99,7 +99,7 @@ export interface CreateGameDto {
   video1?: string;
 }
 
-export interface UpdateGameDto {
+export class UpdateGameDto {
   id: string;
   usaPlayerId: string;
   ussrPlayerId: string;
@@ -112,7 +112,7 @@ export interface UpdateGameDto {
   video1?: string;
 }
 
-export interface GameFilterDto {
+export class GameFilterDto {
   id?: number;
   userFilter?: number[];
   toFilter?: number[];
