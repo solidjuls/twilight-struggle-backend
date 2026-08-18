@@ -1,0 +1,97 @@
+name: Preview Deploy (Cloud Run)
+
+on:
+  pull_request:
+    branches: [main, gc-deploy]
+
+env:
+  PROJECT_ID: api-cron-service
+  REGION: us-central1
+  SERVICE_NAME: twilight-struggle-backend-test
+  IMAGE: gcr.io/api-cron-service/twilight-struggle-backend
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Build and push Docker image
+        run: |
+          gcloud auth configure-docker
+          docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Deploy to Cloud Run (test)
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 3 \
+            --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_TOKEN_COOKIE_NAME=__access_token__,JWT_EXPIRES_IN=60d,NEXT_PUBLIC_MAINTENANCE_MODE=false,NEXT_PUBLIC_API_URL=http://localhost:4002/api,NEXT_PUBLIC_URL=http://localhost:3000,SMTP_FROM=i.twilightstruggle@gmail.com,SMTP_USER=i.twilightstruggle@gmail.com,SMTP_USER_JUNTA=its.junta@gmail.com,SMTP_FROM_JUNTA=its.junta@gmail.com" \
+            --set-secrets "DATABASE_URL=test-DATABASE_URL:latest,JWT_SECRET=test-JWT_SECRET:latest,SMTP_HOST_RESET_PWD=test-SMTP_HOST_RESET_PWD:latest,SMTP_PWD_JUNTA=test-SMTP_PWD_JUNTA:latest,TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET=test-TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET:latest"
+
+      - name: Get preview URL
+        id: url
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "url=$URL" >> $GITHUB_OUTPUT
+
+      - name: Post preview URL to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = '${{ steps.url.outputs.url }}';
+            const sha = '${{ github.sha }}'.substring(0, 7);
+            const body = [
+              '## 🚀 Preview deployed',
+              '',
+              `**URL:** ${url}`,
+              `**Commit:** \`${sha}\``,
+              '',
+              '> This preview auto-updates on every push to this PR.',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c =>
+              c.body.includes('Preview deployed') && c.user.type === 'Bot'
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
