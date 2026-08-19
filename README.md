@@ -158,6 +158,8 @@ This project is configured for Vercel deployment. Follow these steps:
    | `SMTP_SECURE` | "true" or "false" |
    | `SMTP_USER` | SMTP username |
    | `SMTP_PASSWORD` | SMTP password |
+   | `SHRKBOT_API_KEY` | Key for the shrkbot Twilight Struggle API. Tournaments are not sent when it is empty |
+   | `SHRKBOT_API_URL` | Base URL of that API. Defaults to `https://shrkbot.com/api/twilight-struggle/v1` |
 
 4. **Database Setup**
    - Use a MySQL-compatible database (PlanetScale, AWS RDS, etc.)
