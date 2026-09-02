@@ -2,10 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { TournamentDto, RegisteredPlayerDto } from './dto/tournament.dto';
 import { ScheduleDto } from 'src/schedule/dto/schedule.dto';
+import { ShrkbotService } from 'src/shrkbot/shrkbot.service';
 
 @Injectable()
 export class TournamentsService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly shrkbotService: ShrkbotService,
+  ) {}
 
   async getTournamentsByStatus(statusArray: string[]): Promise<TournamentDto[]> {
     const tournaments = await this.databaseService.tournaments.findMany({
@@ -234,6 +238,8 @@ export class TournamentsService {
       });
     }
 
+    await this.shrkbotService.syncTournament(newTournament.id);
+
     return newTournament;
   }
 
@@ -269,11 +275,13 @@ export class TournamentsService {
       },
     });
 
+    await this.shrkbotService.syncTournament(subtournament.id);
+
     return subtournament;
   }
 
   async updateTournament(id: number, status: number): Promise<any> {
-    return await this.databaseService.tournaments.update({
+    const updated = await this.databaseService.tournaments.update({
       where: {
         id: id,
       },
@@ -281,6 +289,10 @@ export class TournamentsService {
         status_id: Number(status),
       },
     });
+
+    await this.shrkbotService.syncTournament(id);
+
+    return updated;
   }
 
   async updateTournamentFull(id: number, updateData: {
@@ -290,7 +302,7 @@ export class TournamentsService {
     startingDate?: Date;
     description?: string;
   }): Promise<any> {
-    return await this.databaseService.tournaments.update({
+    const updated = await this.databaseService.tournaments.update({
       where: {
         id: id,
       },
@@ -302,6 +314,10 @@ export class TournamentsService {
         ...(updateData.description !== undefined && { description: updateData.description }),
       },
     });
+
+    await this.shrkbotService.syncTournament(id);
+
+    return updated;
   }
 
   async registerForTournament(tournamentId: number, userId: string): Promise<any> {
@@ -609,6 +625,9 @@ console.log("scheduleParsed", scheduleParsed);
         id: Number(id),
       },
     });
+
+    await this.shrkbotService.deleteTournament(deleted.id);
+
     return { id: deleted.id };
   }
 
@@ -684,12 +703,16 @@ console.log("scheduleParsed", scheduleParsed);
       throw new Error('User is already an admin for this tournament');
     }
 
-    return await this.databaseService.tournament_admins.create({
+    const created = await this.databaseService.tournament_admins.create({
       data: {
         tournamentId: tournamentId,
         userId: BigInt(userId),
       }
     });
+
+    await this.shrkbotService.syncTournament(tournamentId);
+
+    return created;
   }
 
   async removeTournamentAdmin(tournamentId: number, userId: string): Promise<any> {
@@ -703,6 +726,8 @@ console.log("scheduleParsed", scheduleParsed);
     if (result.count === 0) {
       throw new Error('Admin relationship not found');
     }
+
+    await this.shrkbotService.syncTournament(tournamentId);
 
     return result;
   }
@@ -825,6 +850,8 @@ console.log("scheduleParsed", scheduleParsed);
         updated_at: new Date()
       }
     });
+
+    await this.shrkbotService.syncTournament(tournamentId);
 
     return {
       success: true,
