@@ -45,6 +45,7 @@ export interface CreateScheduleDto {
   r: boolean; // is random
   gc: string; // game code
   randomSides?: boolean; // random sides
+  best_of?: 1 | 3 | 5 | 7 | null;
 }
 
 export interface CsvScheduleRow {

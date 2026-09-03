@@ -233,7 +233,14 @@ export class ScheduleController {
   @Put()
   async addSchedule(@Body() body: { data: CreateScheduleDto }) {
     try {
-      const { usa, ussr, t, d, gc, randomSides } = body.data;
+      const { usa, ussr, t, d, gc, randomSides, best_of } = body.data;
+
+      if (best_of !== undefined && best_of !== null && ![1, 3, 5, 7].includes(best_of)) {
+        throw new HttpException(
+          'best_of must be 1, 3, 5, 7, or null',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
 
       const children = await this.tournamentsService.getChildTournaments([Number(t)]);
       if (children.length > 0) {
@@ -249,7 +256,7 @@ export class ScheduleController {
         Number(t),
         new Date(d),
         gc,
-        null,
+        best_of ?? null,
         randomSides,
       );
 
@@ -268,7 +275,14 @@ export class ScheduleController {
     const results: any[] = [];
     try {
       for (const item of body.data) {
-        const { scheduleId, usa, ussr, t, d, gc, randomSides } = item;
+        const { scheduleId, usa, ussr, t, d, gc, randomSides, best_of } = item;
+
+        if (best_of !== undefined && best_of !== null && ![1, 3, 5, 7].includes(best_of)) {
+          throw new HttpException(
+            'best_of must be 1, 3, 5, 7, or null',
+            HttpStatus.BAD_REQUEST,
+          );
+        }
 
         const children = await this.tournamentsService.getChildTournaments([Number(t)]);
         if (children.length > 0) {
@@ -296,7 +310,7 @@ export class ScheduleController {
             Number(t),
             new Date(d),
             gc,
-            null,
+            best_of ?? null,
             randomSides,
           );
           results.push(updated);
