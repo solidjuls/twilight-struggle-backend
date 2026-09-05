@@ -129,6 +129,21 @@ export class ScheduleService {
     };
   }
 
+  async getTournamentIdsWithSchedulesForUser(userId: number): Promise<Set<number>> {
+    const schedules = await this.databaseService.schedule.findMany({
+      where: {
+        OR: [
+          { usa_player_id: userId },
+          { ussr_player_id: userId },
+        ],
+      },
+      select: { tournaments_id: true },
+      distinct: ['tournaments_id'],
+    });
+
+    return new Set(schedules.map(s => s.tournaments_id));
+  }
+
   async filterTournamentsBySchedule(tournaments: TournamentDto[], userId: number) {
     if (!tournaments.length) {
       return [];

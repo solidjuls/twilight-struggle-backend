@@ -46,7 +46,14 @@ export class ScheduleController {
   private async buildAllUserTournaments(
     ongoingRegistered: TournamentDto[],
     adminTournaments: TournamentDto[],
+    userId: number,
   ): Promise<TournamentDto[]> {
+    const tournamentIdsWithSchedules = await this.scheduleService.getTournamentIdsWithSchedulesForUser(userId);
+
+    const ongoingWithSchedules = ongoingRegistered.filter(
+      t => tournamentIdsWithSchedules.has(Number(t.id)),
+    );
+
     const adminChildren = (
       await Promise.all(
         adminTournaments.map(t => this.tournamentsService.getChildTournaments([Number(t.id)])),
@@ -54,7 +61,7 @@ export class ScheduleController {
     ).flat();
 
     const merged = [
-      ...ongoingRegistered,
+      ...ongoingWithSchedules,
       ...adminChildren.map(c => ({ id: c.id.toString(), tournament_name: c.tournament_name } as TournamentDto)),
     ];
 
@@ -81,7 +88,7 @@ export class ScheduleController {
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
-      const allUserTournaments = await this.buildAllUserTournaments(ongoingUserTournaments, userAdminTournaments);
+      const allUserTournaments = await this.buildAllUserTournaments(ongoingUserTournaments, userAdminTournaments, Number(user.id));
 
       let tournamentIds: string[];
 
