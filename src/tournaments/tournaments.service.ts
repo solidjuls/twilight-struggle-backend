@@ -109,7 +109,7 @@ export class TournamentsService {
     }));
   }
 
-  async getChildTournaments(parentIds: number[]): Promise<{ id: number }[]> {
+  async getChildTournaments(parentIds: number[]): Promise<{ id: number; tournament_name: string }[]> {
     if (!parentIds || parentIds.length === 0) {
       return [];
     }
@@ -122,6 +122,7 @@ export class TournamentsService {
       },
       select: {
         id: true,
+        tournament_name: true,
       },
     });
 

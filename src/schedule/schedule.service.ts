@@ -15,153 +15,92 @@ export class ScheduleService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async getSchedules({
+    tournamentIds,
     userId,
-    tournament,
     page,
     pageSize,
-    adminView,
-    onlyPending,
-    noOpponent,
-    orderBy,
-    orderDirection
   }: {
+    tournamentIds: string[];
     userId?: number;
-    tournament?: string[] | undefined;
     page: number;
     pageSize: number;
-    adminView: boolean;
-    onlyPending?: boolean;
-    noOpponent?: boolean;
-    orderBy?: string;
-    orderDirection?: string;
   }): Promise<ScheduleListResponse> {
     pageSize = pageSize || 20;
     const skip = (page - 1) * pageSize;
 
-    const where: any = {
-      AND: []
+    const tournamentFilter = { tournaments_id: { in: tournamentIds.map(Number) } };
+    const userFilter = userId
+      ? { OR: [{ usa_player_id: userId }, { ussr_player_id: userId }] }
+      : undefined;
+
+    const baseWhere = {
+      AND: [
+        tournamentFilter,
+        ...(userFilter ? [userFilter] : []),
+      ],
     };
 
-    // Add tournament filter if provided
-    if (tournament && tournament.length > 0) {
-      where.AND.push({
-        tournaments_id: { in: tournament.map(t => Number(t)) }
-      });
-    }
-    // Add user filter if not admin view or if specific user is requested
-    if (!adminView && userId) {
-      where.AND.push({
-        OR: [
-          { usa_player_id: userId },
-          { ussr_player_id: userId },
-        ],
-      });
-    }
-
-    // Add pending games filter (games without results)
-    // if (onlyPending) {
-      where.AND.push({
-        game_results_id: null
-      });
-    // }
-
-    if (noOpponent) {
-      where.AND.push({
-        OR: [
-          { usa_player_id: null },
-          { ussr_player_id: null },
-        ],
-      });
-    }
-
-    // Build dynamic orderBy based on parameters
-    const prismaOrderBy: any = [];
-
-    // Map orderBy field to database field
-    const orderByFieldMap = {
-      'dueDate': 'due_date',
-      'gameDate': { game_results: { game_date: orderDirection || 'asc' } },
-      'tournamentName': { tournaments: { tournament_name: orderDirection || 'asc' } }
-    };
-
-    if (orderBy && orderByFieldMap[orderBy]) {
-      if (orderBy === 'dueDate') {
-        prismaOrderBy.push({
-          [orderByFieldMap[orderBy]]: orderDirection || 'asc'
-        });
-      } else {
-        prismaOrderBy.push(orderByFieldMap[orderBy]);
-      }
-    } else {
-      // Default ordering
-      if (!adminView) {
-        prismaOrderBy.push({
-          game_results_id: 'asc',
-        });
-      }
-      prismaOrderBy.push({
-        due_date: 'asc',
-      });
-    }
-    prismaOrderBy.push({
-      id: 'asc',
-    });
-    const totalRows = await this.databaseService.schedule.count({
-      where: where.AND.length > 0 ? where : undefined,
-    });
-
-    const scheduleResults = await this.databaseService.schedule.findMany({
-      select: {
-        game_results: {
-          select: {
-            game_winner: true,
-            game_date: true,
-          }
-        },
-        game_code: true,
-        id: true,
-        game_results_id: true,
-        due_date: true,
-        random_sides: true,
-        best_of: true,
-        tournaments: {
-          select: {
-            tournament_name: true,
-            id: true,
-          },
-        },
-        users_schedule_usa_player_idTousers: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            countries: {
-              select: {
-                tld_code: true,
-              },
-            },
-          },
-        },
-        users_schedule_ussr_player_idTousers: {
-          select: {
-            id: true,
-            first_name: true,
-            last_name: true,
-            countries: {
-              select: {
-                tld_code: true,
-              },
-            },
-          },
+    const selectFields = {
+      game_results: {
+        select: {
+          game_winner: true,
+          game_date: true,
         },
       },
-      orderBy: prismaOrderBy,
-      where: where.AND.length > 0 ? where : undefined,
-      skip,
-      take: pageSize,
+      game_code: true,
+      id: true,
+      game_results_id: true,
+      due_date: true,
+      random_sides: true,
+      best_of: true,
+      tournaments: {
+        select: {
+          tournament_name: true,
+          id: true,
+        },
+      },
+      users_schedule_usa_player_idTousers: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          countries: { select: { tld_code: true } },
+        },
+      },
+      users_schedule_ussr_player_idTousers: {
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          countries: { select: { tld_code: true } },
+        },
+      },
+    };
+
+    const unplayedCount = await this.databaseService.schedule.count({
+      where: { ...baseWhere, game_results_id: null },
+    });
+    const playedCount = await this.databaseService.schedule.count({
+      where: { ...baseWhere, game_results_id: { not: null } },
+    });
+    const totalRows = unplayedCount + playedCount;
+
+    const unplayed = await this.databaseService.schedule.findMany({
+      select: selectFields,
+      where: { ...baseWhere, game_results_id: null },
+      orderBy: [{ due_date: 'asc' }, { id: 'asc' }],
     });
 
-    const results: ScheduleDto[] = scheduleResults.map(result => ({
+    const played = await this.databaseService.schedule.findMany({
+      select: selectFields,
+      where: { ...baseWhere, game_results_id: { not: null } },
+      orderBy: [{ game_results: { game_date: 'asc' } }, { id: 'asc' }],
+    });
+
+    const combined = [...unplayed, ...played];
+    const paginatedResults = combined.slice(skip, skip + pageSize);
+
+    const results: ScheduleDto[] = paginatedResults.map(result => ({
       gameWinner: result.game_results?.game_winner || null,
       gameDate: result.game_results?.game_date?.toISOString() || null,
       dueDate: result.due_date.toISOString(),
@@ -177,7 +116,7 @@ export class ScheduleService {
       countryUssr: result.users_schedule_ussr_player_idTousers?.countries?.tld_code || null,
       idUssr: result.users_schedule_ussr_player_idTousers?.id?.toString() || '',
       tournamentName: result.tournaments.tournament_name,
-      tournamentId: result.tournaments.id.toString()
+      tournamentId: result.tournaments.id.toString(),
     }));
 
     const totalPages = Math.ceil(totalRows / pageSize);
@@ -186,7 +125,7 @@ export class ScheduleService {
       results,
       totalRows,
       currentPage: page,
-      totalPages
+      totalPages,
     };
   }
 

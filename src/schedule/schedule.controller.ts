@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ScheduleService } from './schedule.service';
 import { TournamentsService } from '../tournaments/tournaments.service';
+import { TournamentDto } from '../tournaments/dto/tournament.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayloadDto } from '../auth/dto/auth.dto';
@@ -36,132 +37,82 @@ export class ScheduleController {
     private readonly tournamentsService: TournamentsService,
   ) {}
 
+  private async resolveWithChildTournaments(parentIds: string[]): Promise<string[]> {
+    const children = await this.tournamentsService.getChildTournaments(parentIds.map(Number));
+    const childIds = children.map(t => t.id.toString());
+    return [...new Set([...parentIds, ...childIds])];
+  }
+
+  private async buildAllUserTournaments(
+    ongoingRegistered: TournamentDto[],
+    adminTournaments: TournamentDto[],
+  ): Promise<TournamentDto[]> {
+    const adminChildren = (
+      await Promise.all(
+        adminTournaments.map(t => this.tournamentsService.getChildTournaments([Number(t.id)])),
+      )
+    ).flat();
+
+    const merged = [
+      ...ongoingRegistered,
+      ...adminChildren.map(c => ({ id: c.id.toString(), tournament_name: c.tournament_name } as TournamentDto)),
+    ];
+
+    return merged.filter((t, i, self) => self.findIndex(x => x.id === t.id) === i);
+  }
+
   @Get()
   async getSchedules(
     @Query() query: GetSchedulesQueryDto,
     @CurrentUser() user: JwtPayloadDto,
   ): Promise<ScheduleListResponse> {
     try {
-      // Handle new parameter format
       const {
-        userId,
         tournamentId,
+        userId,
+        fullSchedule = false,
         page = '1',
         pageSize = '20',
-        onlyPending,
-        noOpponent,
-        orderBy = 'dueDate',
-        orderDirection = 'asc',
-        a = '0',
       } = query;
 
-      // Use new parameters if available, otherwise fall back to legacy
-      const finalUserId = userId || user.id.toString();
-      const finalPage = page || '1';
-      const finalPageSize = pageSize || '20';
+      const parsedPage = Number(page);
+      const parsedPageSize = Number(pageSize);
 
-      // Get user's registered tournaments first
       const userTournaments = await this.tournamentsService.getUserRegisteredTournaments(user.id.toString());
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
-      const tournamentsWithActiveSchedules = await this.scheduleService.filterTournamentsBySchedule(ongoingUserTournaments, Number(finalUserId));
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
-      const allTournaments = [...tournamentsWithActiveSchedules, ...userAdminTournaments]
-      const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
-        index === self.findIndex(t => t.id === tournament.id)
-      );
+      const allUserTournaments = await this.buildAllUserTournaments(ongoingUserTournaments, userAdminTournaments);
 
-      // Parse parameters
-      const parsedUserId = finalUserId ? Number(finalUserId) : undefined;
-      const parsedPage = Number(finalPage);
-      const parsedPageSize = Number(finalPageSize);
-      const parsedOnlyPending = onlyPending === 'true';
-      const adminView = a === '1';
-
-      // Handle tournament parameter - make it mandatory
-      let parsedTournamentIds: string[] | undefined;
+      let tournamentIds: string[];
 
       if (tournamentId) {
-        const requestedIds = tournamentId.split(',');
-        // Get child tournaments (those with parent_id matching the requested tournament IDs)
-        const childTournaments = await this.tournamentsService.getChildTournaments(requestedIds.map(Number));
-        const childIds = childTournaments.map(t => t.id.toString());
-        parsedTournamentIds = [...requestedIds, ...childIds];
+        tournamentIds = await this.resolveWithChildTournaments(tournamentId.split(','));
       } else if (ongoingUserTournaments.length > 0) {
-        const ongoingUniqueTournaments = uniqueTournaments.filter(t => t.status_id === 4);
-        const defaultTournament = ongoingUniqueTournaments.length > 0
-          ? ongoingUniqueTournaments[0]
-          : ongoingUserTournaments[0];
-
-        // Get child tournaments for the default tournament
-        const childTournaments = await this.tournamentsService.getChildTournaments([Number(defaultTournament.id)]);
-        const childIds = childTournaments.map(t => t.id.toString());
-        parsedTournamentIds = [defaultTournament.id, ...childIds];
+        tournamentIds = await this.resolveWithChildTournaments([ongoingUserTournaments[0].id.toString()]);
       } else {
         return {
           results: [],
           totalRows: 0,
           currentPage: parsedPage,
           totalPages: 0,
-          userTournaments: uniqueTournaments,
+          userTournaments: allUserTournaments,
           defaultTournament: '',
         };
       }
-      // // validate tournament is open for non-admin view
-      // if (finalUserId) {
-      //   const openTournament = ongoingUserTournaments.filter(t => t.id === parsedTournamentIds[0] && t.status_id === 4);
-      //   console.log("parsedTournamentIds1", parsedTournamentIds, adminView, finalUserId, openTournament);
-      //   if (openTournament.length === 0) { 
-      //     return {
-      //       results: [],
-      //       totalRows: 0,
-      //       currentPage: parsedPage,
-      //       totalPages: 0,
-      //       userTournaments: uniqueTournaments,
-      //       defaultTournament: parsedTournamentIds[0],
-      //     };
-      //   }
-      // }
 
-      // Find if user is admin of tournamentId
-      const userIsAdmin = userAdminTournaments.some(t => t.id === parsedTournamentIds[0]);
-
-      if (userId && !userIsAdmin && userId !== user.id.toString()) {
-        throw new HttpException('Insufficient permissions', HttpStatus.FORBIDDEN);
-      }
-
-      // Validate orderBy parameter
-      const validOrderBy = ['dueDate', 'gameDate', 'tournamentName'];
-      const finalOrderBy = validOrderBy.includes(orderBy) ? orderBy : 'dueDate';
-
-      // Validate orderDirection parameter
-      const validOrderDirection = ['asc', 'desc'];
-      const finalOrderDirection = validOrderDirection.includes(orderDirection) ? orderDirection : 'asc';
+      const filterUserId = fullSchedule ? undefined : (userId ? Number(userId) : Number(user.id));
 
       const result = await this.scheduleService.getSchedules({
-        userId: parsedUserId,
-        tournament: parsedTournamentIds,
+        tournamentIds,
+        userId: filterUserId,
         page: parsedPage,
         pageSize: parsedPageSize,
-        adminView,
-        noOpponent,
-        onlyPending: parsedOnlyPending,
-        orderBy: finalOrderBy,
-        orderDirection: finalOrderDirection,
       });
 
-      result.results.sort((a, b) => {
-        if (a.gameResultsId === null && b.gameResultsId !== null) {
-          return -1;
-        }
-        if (a.gameResultsId !== null && b.gameResultsId === null) {
-          return 1;
-        }
-        return 0;
-      });
       return {
         ...result,
-        userTournaments: uniqueTournaments,
-        defaultTournament: parsedTournamentIds[0],
+        userTournaments: allUserTournaments,
+        defaultTournament: tournamentIds[0],
       };
     } catch (error) {
       console.error('[Schedule GET]', error);
