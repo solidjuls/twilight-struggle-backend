@@ -10,6 +10,7 @@ import {
   RecreateGameDto,
 } from './dto/game.dto';
 import { PrismaClient } from '@prisma/client';
+import { ShrkbotService } from 'src/shrkbot/shrkbot.service';
 
 const FRIENDLY_GAME = 47
 
@@ -18,6 +19,7 @@ export class GamesService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly ratingService: RatingService,
+    private readonly shrkbotService: ShrkbotService,
   ) {}
 
   private async createPrismaFilter(filter: GameFilterDto): Promise<any> {
@@ -345,6 +347,8 @@ export class GamesService {
         },
       });
 
+      await this.shrkbotService.syncGame(result.id);
+
       // Convert BigInt to string for JSON serialization
       const resultParsed = JSON.stringify(result, (_key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
@@ -546,6 +550,9 @@ export class GamesService {
       throw error;
     }
 
+    // Only past the catch is the transaction committed.
+    await this.shrkbotService.syncGame(Number(input.oldId));
+
     return { success: true };
   }
 
@@ -672,6 +679,9 @@ export class GamesService {
       console.error('Error recreating ratings:', error);
       throw error;
     }
+
+    // Only past the catch is the transaction committed.
+    await this.shrkbotService.deleteGame(Number(input.oldId));
 
     return { success: true };
   }
