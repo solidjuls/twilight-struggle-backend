@@ -186,32 +186,24 @@ describe('buildGamePayload', () => {
     expect(payload.usa.name).toBe('Ada');
   });
 
-  it('sends the flag of the player country', () => {
+  it('sends the country code as the site spells it, leaving the flag to shrkbot', () => {
     const payload = buildGamePayload(
       game({ users_game_results_usa_player_idTousers: player({ countries: { tld_code: 'DE' } }) }),
     );
 
-    expect(payload.usa.flag).toBe('🇩🇪');
+    expect(payload.usa.country_code).toBe('DE');
   });
 
-  it('sends the British flag for the United Kingdom, whose code is not its flag', () => {
+  it('sends a country code that is not a two-letter ccTLD unchanged', () => {
     const payload = buildGamePayload(
-      game({ users_game_results_usa_player_idTousers: player({ countries: { tld_code: 'UK' } }) }),
+      game({ users_game_results_usa_player_idTousers: player({ countries: { tld_code: 'SCOT' } }) }),
     );
 
-    expect(payload.usa.flag).toBe('🇬🇧');
+    expect(payload.usa.country_code).toBe('SCOT');
   });
 
-  it('omits the flag for a country the table does not cover', () => {
-    const payload = buildGamePayload(
-      game({ users_game_results_usa_player_idTousers: player({ countries: { tld_code: 'ZZ' } }) }),
-    );
-
-    expect(payload.usa).not.toHaveProperty('flag');
-  });
-
-  it('omits the flag for a player who states no country', () => {
-    expect(buildGamePayload(game()).usa).not.toHaveProperty('flag');
+  it('omits the country for a player who states none', () => {
+    expect(buildGamePayload(game()).usa).not.toHaveProperty('country_code');
   });
 
   it('sends the player Discord ID as a string', () => {

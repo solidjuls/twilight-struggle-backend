@@ -1,5 +1,3 @@
-import { COUNTRY_FLAGS } from './country-flags';
-
 export interface TournamentRow {
   id: number;
   tournament_name: string;
@@ -55,7 +53,7 @@ export interface GameRow {
 
 export interface PlayerPayload {
   name: string;
-  flag?: string;
+  country_code?: string;
   discord_id?: string;
   rating_before?: number;
   rating_after?: number;
@@ -106,11 +104,9 @@ export function buildGamePayload(game: GameRow): GamePayload {
 }
 
 function buildPlayerPayload(player: GamePlayerRow | null, ratingBefore: number, ratingAfter?: number): PlayerPayload {
-  const flag = player?.countries && COUNTRY_FLAGS[player.countries.tld_code.toLowerCase()];
-
   return {
     name: `${player?.first_name || ''} ${player?.last_name || ''}`.trim(),
-    ...(flag && { flag }),
+    ...(player?.countries && { country_code: player.countries.tld_code }),
     ...(player?.discord_user_id && { discord_id: String(player.discord_user_id) }),
     // The columns default to 0, and the site starts every player well above that,
     // so a 0 means the rating was never written rather than a rating of zero.
