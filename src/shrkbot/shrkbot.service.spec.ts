@@ -7,6 +7,10 @@ import { DatabaseService } from '../database/database.service';
 const API_URL = 'https://shrkbot.test/api/twilight-struggle/v1';
 const API_KEY = 'shrkbot_test_key';
 
+const GAME_ID = BigInt(1024);
+const USA_PLAYER_ID = BigInt(11);
+const USSR_PLAYER_ID = BigInt(22);
+
 const row = (id: number, parent_id: number | null = null) => ({
   id,
   tournament_name: `Tournament ${id}`,
@@ -15,9 +19,40 @@ const row = (id: number, parent_id: number | null = null) => ({
   tournament_admins: [{ users: { discord_user_id: BigInt('123456789012345678') } }],
 });
 
+const gameRow = (overrides: Record<string, unknown> = {}) => ({
+  id: GAME_ID,
+  tournament_id: 7,
+  game_code: 'R1',
+  game_date: new Date('2026-07-20T00:00:00Z'),
+  reported_at: new Date('2026-07-24T10:00:00Z'),
+  game_winner: '1',
+  end_turn: 6,
+  end_mode: 'DEFCON',
+  video1: null,
+  usa_player_id: USA_PLAYER_ID,
+  ussr_player_id: USSR_PLAYER_ID,
+  usa_previous_rating: 5578,
+  ussr_previous_rating: 5824,
+  ratings_history: [],
+  users_game_results_usa_player_idTousers: {
+    first_name: 'Ada',
+    last_name: 'Lovelace',
+    discord_user_id: null,
+    countries: null,
+  },
+  users_game_results_ussr_player_idTousers: {
+    first_name: 'Grace',
+    last_name: 'Hopper',
+    discord_user_id: null,
+    countries: null,
+  },
+  ...overrides,
+});
+
 describe('ShrkbotService', () => {
   let service: ShrkbotService;
   let findUnique: jest.Mock;
+  let findGame: jest.Mock;
   let fetchMock: jest.Mock;
   let logError: jest.SpyInstance;
 
@@ -25,7 +60,10 @@ describe('ShrkbotService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShrkbotService,
-        { provide: DatabaseService, useValue: { tournaments: { findUnique } } },
+        {
+          provide: DatabaseService,
+          useValue: { tournaments: { findUnique }, game_results: { findUnique: findGame } },
+        },
         { provide: ConfigService, useValue: { get: (key: string) => config[key] } },
       ],
     }).compile();
@@ -41,6 +79,7 @@ describe('ShrkbotService', () => {
 
   beforeEach(async () => {
     findUnique = jest.fn().mockImplementation(({ where }) => Promise.resolve(row(where.id)));
+    findGame = jest.fn().mockResolvedValue(gameRow());
     fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
     global.fetch = fetchMock as unknown as typeof fetch;
     logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -147,6 +186,94 @@ describe('ShrkbotService', () => {
     });
   });
 
+  describe('syncGame', () => {
+    it('puts the game to its own external id', async () => {
+      await service.syncGame(GAME_ID);
+
+      expect(requestTo(1).url).toBe(`${API_URL}/games/1024`);
+      expect(requestTo(1).options.method).toBe('PUT');
+    });
+
+    it('sends the tournament before the game, which shrkbot needs to place it', async () => {
+      await service.syncGame(GAME_ID);
+
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        `${API_URL}/tournaments/7`,
+        `${API_URL}/games/1024`,
+      ]);
+    });
+
+    it('sends no tournament for a friendly game', async () => {
+      findGame.mockResolvedValue(gameRow({ tournament_id: 47 }));
+
+      await service.syncGame(GAME_ID);
+
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([`${API_URL}/games/1024`]);
+    });
+
+    it('wraps the payload in a game key', async () => {
+      await service.syncGame(GAME_ID);
+
+      expect(requestTo(1).body.game).toMatchObject({
+        tournament_external_id: '7',
+        winning_side: 'usa',
+        usa: { name: 'Ada Lovelace' },
+        ussr: { name: 'Grace Hopper' },
+      });
+    });
+
+    it('accepts the id as a number', async () => {
+      await service.syncGame(1024);
+
+      expect(requestTo(1).url).toBe(`${API_URL}/games/1024`);
+    });
+
+    it('sends nothing for a game that no longer exists', async () => {
+      findGame.mockResolvedValue(null);
+
+      await service.syncGame(GAME_ID);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('logs a rejected request instead of throwing', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 422, text: async () => 'unknown tournament' });
+
+      await expect(service.syncGame(GAME_ID)).resolves.toBeUndefined();
+      expect(logError).toHaveBeenCalled();
+    });
+
+    it('logs an unreachable shrkbot instead of throwing', async () => {
+      fetchMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
+
+      await expect(service.syncGame(GAME_ID)).resolves.toBeUndefined();
+      expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteGame', () => {
+    it('deletes the game by its external id', async () => {
+      await service.deleteGame(GAME_ID);
+
+      expect(fetchMock.mock.calls[0][0]).toBe(`${API_URL}/games/1024`);
+      expect(fetchMock.mock.calls[0][1].method).toBe('DELETE');
+      expect(fetchMock.mock.calls[0][1].body).toBeUndefined();
+    });
+
+    it('reads nothing from the database', async () => {
+      await service.deleteGame(GAME_ID);
+
+      expect(findGame).not.toHaveBeenCalled();
+    });
+
+    it('logs a rejected request instead of throwing', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 500, text: async () => 'boom' });
+
+      await expect(service.deleteGame(GAME_ID)).resolves.toBeUndefined();
+      expect(logError).toHaveBeenCalled();
+    });
+  });
+
   describe('without an API key', () => {
     beforeEach(async () => {
       service = await build({ SHRKBOT_API_URL: API_URL });
@@ -160,6 +287,18 @@ describe('ShrkbotService', () => {
 
     it('sends no deletion', async () => {
       await service.deleteTournament(7);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends no game', async () => {
+      await service.syncGame(GAME_ID);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends no game deletion', async () => {
+      await service.deleteGame(GAME_ID);
 
       expect(fetchMock).not.toHaveBeenCalled();
     });

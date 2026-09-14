@@ -1,10 +1,23 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service';
-import { buildTournamentPayload, TournamentRow } from './shrkbot.payloads';
+import {
+  buildGamePayload,
+  buildTournamentPayload,
+  FRIENDLY_GAME_TOURNAMENT_ID,
+  GameRow,
+  TournamentRow,
+} from './shrkbot.payloads';
 
 const DEFAULT_API_URL = 'https://shrkbot.com/api/twilight-struggle/v1';
 const REQUEST_TIMEOUT_MS = 5000;
+
+const PLAYER_SELECT = {
+  first_name: true,
+  last_name: true,
+  discord_user_id: true,
+  countries: { select: { tld_code: true } },
+};
 
 @Injectable()
 export class ShrkbotService implements OnModuleInit {
@@ -56,6 +69,43 @@ export class ShrkbotService implements OnModuleInit {
     }
   }
 
+  async syncGame(gameResultId: bigint | number): Promise<void> {
+    if (!this.apiKey) {
+      return;
+    }
+
+    const id = BigInt(gameResultId);
+
+    try {
+      const game = await this.findGame(id);
+      if (!game) {
+        return;
+      }
+
+      if (game.tournament_id !== null && game.tournament_id !== FRIENDLY_GAME_TOURNAMENT_ID) {
+        await this.syncTournament(game.tournament_id);
+      }
+
+      await this.send('PUT', `games/${id}`, { game: buildGamePayload(game) });
+    } catch (error) {
+      this.logger.error(`Failed to send game ${id} to shrkbot`, error);
+    }
+  }
+
+  async deleteGame(gameResultId: bigint | number): Promise<void> {
+    if (!this.apiKey) {
+      return;
+    }
+
+    const id = BigInt(gameResultId);
+
+    try {
+      await this.send('DELETE', `games/${id}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete game ${id} from shrkbot`, error);
+    }
+  }
+
   // Parents first: shrkbot answers 422 for a tournament whose parent it does not know yet.
   private async tournamentLineage(tournamentId: number): Promise<TournamentRow[]> {
     const lineage: TournamentRow[] = [];
@@ -86,6 +136,30 @@ export class ShrkbotService implements OnModuleInit {
         parent_id: true,
         TournamentStatus: { select: { status_name: true } },
         tournament_admins: { select: { users: { select: { discord_user_id: true } } } },
+      },
+    });
+  }
+
+  private async findGame(id: bigint): Promise<GameRow | null> {
+    return await this.databaseService.game_results.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        tournament_id: true,
+        game_code: true,
+        game_date: true,
+        reported_at: true,
+        game_winner: true,
+        end_turn: true,
+        end_mode: true,
+        video1: true,
+        usa_player_id: true,
+        ussr_player_id: true,
+        usa_previous_rating: true,
+        ussr_previous_rating: true,
+        ratings_history: { select: { player_id: true, rating: true } },
+        users_game_results_usa_player_idTousers: { select: PLAYER_SELECT },
+        users_game_results_ussr_player_idTousers: { select: PLAYER_SELECT },
       },
     });
   }

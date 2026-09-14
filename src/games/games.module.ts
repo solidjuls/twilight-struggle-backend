@@ -7,9 +7,10 @@ import { DatabaseModule } from '../database/database.module';
 import { RatingModule } from '../rating/rating.module';
 import { UsersModule } from 'src/users/users.module';
 import { EmailModule } from 'src/email/email.module';
+import { ShrkbotModule } from 'src/shrkbot/shrkbot.module';
 
 @Module({
-  imports: [DatabaseModule, RatingModule, ScheduleModule, PlayoffsModule, EmailModule, UsersModule],
+  imports: [DatabaseModule, RatingModule, ScheduleModule, PlayoffsModule, EmailModule, UsersModule, ShrkbotModule],
   controllers: [GamesController],
   providers: [GamesService],
   exports: [GamesService],
