@@ -30,14 +30,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       # --- Generate PR spec ---
       - name: Install dependencies (PR)
-        run: yarn install --immutable
+        run: npm ci
 
       - name: Generate OpenAPI spec (PR)
-        run: yarn ts-node scripts/generate-spec.ts
+        run: npx ts-node scripts/generate-spec.ts
         env: *app-env
         continue-on-error: true
 
@@ -56,10 +56,10 @@ jobs:
         run: git checkout ${{ github.event.pull_request.base.sha }}
 
       - name: Install dependencies (base)
-        run: yarn install --immutable || true
+        run: npm ci || true
 
       - name: Generate OpenAPI spec (base)
-        run: yarn ts-node scripts/generate-spec.ts
+        run: npx ts-node scripts/generate-spec.ts
         env: *app-env
         continue-on-error: true
 
