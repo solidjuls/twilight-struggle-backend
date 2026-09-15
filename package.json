@@ -9,7 +9,7 @@
     "node": ">=20.x"
   },
   "scripts": {
-    "prebuild": "prisma generate",
+    "prebuild": "rm -rf dist tsconfig.build.tsbuildinfo && prisma generate",
     "build": "nest build",
     "postinstall": "prisma generate",
     "vercel-build": "prisma generate && nest build",

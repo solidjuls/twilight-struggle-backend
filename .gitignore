@@ -6,3 +6,4 @@ dist
 .env*.local
 .env
 openapi.json
+*.tsbuildinfo
