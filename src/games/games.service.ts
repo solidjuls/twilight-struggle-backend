@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RatingService } from '../rating/rating.service';
 import {
@@ -359,6 +359,23 @@ export class GamesService {
       console.error('Error submitting game:', error);
       throw error;
     }
+  }
+
+  async getTournamentIdForGame(gameId: bigint): Promise<number | null> {
+    const game = await this.databaseService.game_results.findUnique({
+      where: { id: gameId },
+      select: { tournament_id: true },
+    });
+
+    if (!game) {
+      throw new NotFoundException(`Game ${gameId} does not exist`);
+    }
+
+    return game.tournament_id;
+  }
+
+  async resyncGame(gameId: bigint): Promise<void> {
+    await this.shrkbotService.pushGame(gameId);
   }
 
   async recreateGame(data: RecreateGameDto, userRole: number, userEmail: string): Promise<any> {

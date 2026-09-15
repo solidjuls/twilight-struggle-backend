@@ -5,6 +5,7 @@ import { ScheduleService } from '../schedule/schedule.service';
 import { PlayoffsService } from '../playoffs/playoffs.service';
 import { EmailService } from '../email/email.service';
 import { UsersService } from '../users/users.service';
+import { TournamentsService } from '../tournaments/tournaments.service';
 import { SeedType } from './dto/game.dto';
 
 type SeriesGame = {
@@ -49,6 +50,7 @@ describe('GamesController.getSeriesWinner', () => {
         { provide: PlayoffsService, useValue: {} },
         { provide: EmailService, useValue: {} },
         { provide: UsersService, useValue: {} },
+        { provide: TournamentsService, useValue: {} },
       ],
     }).compile();
 
@@ -116,5 +118,66 @@ describe('GamesController.getSeriesWinner', () => {
     ];
 
     expect(controller.getSeriesWinner(games, 3, seedB, seedA)).toBe(PLAYER_A);
+  });
+});
+
+describe('GamesController.resyncGame', () => {
+  const TOURNAMENT_ID = 7;
+  const GAME_ID = '48306';
+
+  let controller: GamesController;
+  let getTournamentIdForGame: jest.Mock;
+  let resyncGame: jest.Mock;
+  let isUserAdminForTournament: jest.Mock;
+
+  const requestBy = (role: number) => ({ user: { id: 1, role, mail: 'player@example.com' } });
+
+  beforeEach(async () => {
+    getTournamentIdForGame = jest.fn().mockResolvedValue(TOURNAMENT_ID);
+    resyncGame = jest.fn().mockResolvedValue(undefined);
+    isUserAdminForTournament = jest.fn().mockResolvedValue(false);
+
+    const module: TestingModule = await Test.createTestingModule({
+      controllers: [GamesController],
+      providers: [
+        { provide: GamesService, useValue: { getTournamentIdForGame, resyncGame } },
+        { provide: ScheduleService, useValue: {} },
+        { provide: PlayoffsService, useValue: {} },
+        { provide: EmailService, useValue: {} },
+        { provide: UsersService, useValue: {} },
+        { provide: TournamentsService, useValue: { isUserAdminForTournament } },
+      ],
+    }).compile();
+
+    controller = module.get<GamesController>(GamesController);
+  });
+
+  it('refuses a player who does not administer the tournament', async () => {
+    await expect(controller.resyncGame(GAME_ID, requestBy(3))).rejects.toMatchObject({ status: 403 });
+    expect(resyncGame).not.toHaveBeenCalled();
+  });
+
+  it('sends the game again for an admin of its tournament', async () => {
+    isUserAdminForTournament.mockResolvedValue(true);
+
+    await expect(controller.resyncGame(GAME_ID, requestBy(3))).resolves.toEqual({ ok: true });
+    expect(resyncGame).toHaveBeenCalledWith(BigInt(GAME_ID));
+  });
+
+  it('sends the game again for a superadmin, which a friendly game has no other admin for', async () => {
+    getTournamentIdForGame.mockResolvedValue(47);
+
+    await expect(controller.resyncGame(GAME_ID, requestBy(1))).resolves.toEqual({ ok: true });
+    expect(resyncGame).toHaveBeenCalledWith(BigInt(GAME_ID));
+  });
+
+  it('reports a shrkbot failure instead of claiming the game was sent', async () => {
+    isUserAdminForTournament.mockResolvedValue(true);
+    resyncGame.mockRejectedValue(new Error('shrkbot answered 422 to PUT games/48306'));
+
+    await expect(controller.resyncGame(GAME_ID, requestBy(3))).rejects.toMatchObject({
+      status: 502,
+      message: 'shrkbot answered 422 to PUT games/48306',
+    });
   });
 });
