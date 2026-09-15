@@ -1,7 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { ShrkbotService } from './shrkbot.service';
+import { ShrkbotService, ShrkbotDisabledError } from './shrkbot.service';
 import { DatabaseService } from '../database/database.service';
 
 const API_URL = 'https://shrkbot.test/api/twilight-struggle/v1';
@@ -248,6 +248,35 @@ describe('ShrkbotService', () => {
 
       await expect(service.syncGame(GAME_ID)).resolves.toBeUndefined();
       expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('pushGame', () => {
+    it('reports a rejected request instead of logging it', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 422, text: async () => 'unknown tournament' });
+
+      await expect(service.pushGame(GAME_ID)).rejects.toThrow('shrkbot answered 422');
+      expect(logError).not.toHaveBeenCalled();
+    });
+
+    it('does not send the game when its tournament was refused', async () => {
+      fetchMock.mockImplementation((url: string) =>
+        Promise.resolve(
+          url.includes('/tournaments/')
+            ? { ok: false, status: 422, text: async () => 'unknown parent' }
+            : { ok: true, status: 200, text: async () => '' },
+        ),
+      );
+
+      await expect(service.pushGame(GAME_ID)).rejects.toThrow('shrkbot answered 422');
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([`${API_URL}/tournaments/7`]);
+    });
+
+    it('reports that the integration is off when no key is configured', async () => {
+      service = await build({ SHRKBOT_API_URL: API_URL });
+
+      await expect(service.pushGame(GAME_ID)).rejects.toThrow(ShrkbotDisabledError);
+      expect(fetchMock).not.toHaveBeenCalled();
     });
   });
 
