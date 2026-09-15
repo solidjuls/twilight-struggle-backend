@@ -1,0 +1,1 @@
+- [Deployment setup](project/deployment.md) — GCP Cloud Run, manual deploy.sh, prod/test envs, Secret Manager

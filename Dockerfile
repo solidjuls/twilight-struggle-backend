@@ -1,5 +1,8 @@
-FROM node:18-bookworm-slim AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
+
+ARG DATABASE_URL="mysql://dummy:dummy@localhost:3306/dummy"
+ENV DATABASE_URL=${DATABASE_URL}
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
@@ -9,7 +12,7 @@ COPY . .
 RUN npm run build
 
 # --- Production image ---
-FROM node:18-bookworm-slim
+FROM node:20-bookworm-slim
 WORKDIR /app
 
 COPY --from=builder /app/dist ./dist
