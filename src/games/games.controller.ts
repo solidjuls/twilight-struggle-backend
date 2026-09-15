@@ -28,7 +28,9 @@ import {
 import { ScheduleService } from 'src/schedule/schedule.service';
 import { PlayoffsService } from 'src/playoffs/playoffs.service';
 import { UsersService } from 'src/users/users.service';
-import { UserDetailDto } from 'src/users/dto/users.dto';
+import { TournamentsService } from 'src/tournaments/tournaments.service';
+
+const SUPERADMIN_ROLE = 1;
 
 @Controller('games')
 @UseGuards(JwtAuthGuard)
@@ -37,7 +39,8 @@ export class GamesController {
     private readonly gamesService: GamesService,
     private readonly scheduleService: ScheduleService,
     private readonly playoffsService: PlayoffsService,
-    private readonly usersService: UsersService
+    private readonly usersService: UsersService,
+    private readonly tournamentsService: TournamentsService
 
   ) {}
 
@@ -334,6 +337,33 @@ export class GamesController {
       throw new HttpException(
         error.message || 'Internal server error',
         HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post(':id/resync')
+  async resyncGame(@Param('id') id: string, @Req() req: any) {
+    const user = req.user;
+    const gameId = BigInt(id);
+    const tournamentId = await this.gamesService.getTournamentIdForGame(gameId);
+
+    const isTournamentAdmin = await this.tournamentsService.isUserAdminForTournament(
+      user?.role,
+      user?.id?.toString(),
+      tournamentId ?? undefined,
+    );
+
+    if (!isTournamentAdmin) {
+      throw new HttpException('You are not admin of this tournament', HttpStatus.FORBIDDEN);
+    }
+
+    try {
+      await this.gamesService.resyncGame(gameId);
+      return { ok: true };
+    } catch (error) {
+      throw new HttpException(
+        error.message || 'Could not send the result to shrkbot',
+        HttpStatus.BAD_GATEWAY,
       );
     }
   }
