@@ -395,7 +395,7 @@ export class TournamentsController {
   async getWaitlistPlayers(@Param('id') id: string, @CurrentUser() user: JwtPayloadDto) {
     try {
       const tournamentId = Number(id);
-      const userRole = user?.role || 1;
+      const userRole = user?.role || 3;
       const userId = user?.id?.toString() || '';
 
       const waitlistPlayers = await this.tournamentsService.getWaitlistPlayers(tournamentId, userRole, userId);
