@@ -18,7 +18,7 @@ export class AdminGuard implements CanActivate {
       throw new ForbiddenException('User not authenticated');
     }
 
-    // Check if user is SUPERADMIN (role 1) or ADMIN (role 2)
+    // Check if user is SUPERADMIN (role 1) or TOURNAMENT_ADMIN (role 2)
     if (user.role === 1 || user.role === 2) {
       return true;
     }

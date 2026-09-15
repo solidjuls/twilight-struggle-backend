@@ -157,3 +157,48 @@ describe('TournamentsService keeps writing while shrkbot is unreachable', () => 
     await expect(service.deleteTournament(String(TOURNAMENT_ID))).resolves.toEqual({ id: TOURNAMENT_ID });
   });
 });
+
+describe('TournamentsService decides who administers a tournament', () => {
+  let service: TournamentsService;
+  let findFirst: jest.Mock;
+
+  const SUPERADMIN = 1;
+  const TOURNAMENT_ADMIN = 2;
+  const PLAYER = 3;
+
+  beforeEach(async () => {
+    findFirst = jest.fn().mockResolvedValue(null);
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        TournamentsService,
+        { provide: DatabaseService, useValue: { tournament_admins: { findFirst } } },
+        { provide: ShrkbotService, useValue: {} },
+      ],
+    }).compile();
+
+    service = module.get<TournamentsService>(TournamentsService);
+  });
+
+  it('refuses a superadmin who administers no tournament at all', async () => {
+    await expect(service.isUserAdminForTournament(SUPERADMIN, USER_ID, TOURNAMENT_ID)).resolves.toBe(false);
+  });
+
+  it('refuses a tournament admin on a tournament that is not theirs', async () => {
+    await expect(service.isUserAdminForTournament(TOURNAMENT_ADMIN, USER_ID, TOURNAMENT_ID)).resolves.toBe(false);
+  });
+
+  it('refuses a player with no admin row for the tournament', async () => {
+    await expect(service.isUserAdminForTournament(PLAYER, USER_ID, TOURNAMENT_ID)).resolves.toBe(false);
+  });
+
+  it('accepts a player who administers that tournament', async () => {
+    findFirst.mockResolvedValue({ id: 1 });
+
+    await expect(service.isUserAdminForTournament(PLAYER, USER_ID, TOURNAMENT_ID)).resolves.toBe(true);
+  });
+
+  it('refuses a player when no tournament is named', async () => {
+    await expect(service.isUserAdminForTournament(PLAYER, USER_ID, undefined)).resolves.toBe(false);
+  });
+});

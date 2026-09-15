@@ -18,6 +18,6 @@ export const CurrentUser = createParamDecorator(
 // Role constants for better readability
 export const USER_ROLES = {
   SUPERADMIN: 1,
-  ADMIN: 2,
+  TOURNAMENT_ADMIN: 2,
   PLAYER: 3,
 } as const;
