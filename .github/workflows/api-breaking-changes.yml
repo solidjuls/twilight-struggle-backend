@@ -4,20 +4,19 @@ on:
   pull_request:
     branches: [main, gc-deploy]
 
-env:
-  APP_ENV: &app-env
-    DATABASE_URL: mysql://localhost:3306/dummy
-    SECRET: ci-placeholder
-    TOKEN_SECRET: ci-placeholder
-    JWT_SECRET: ci-placeholder
-    TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET: ci-placeholder
-    SMTP_HOST_RESET_PWD: ci-placeholder
-    SMTP_USER: ci-placeholder
-    SMTP_PWD: ci-placeholder
-    SMTP_USER_JUNTA: ci-placeholder
-    SMTP_PWD_JUNTA: ci-placeholder
-    SMTP_FROM: ci-placeholder
-    SMTP_FROM_JUNTA: ci-placeholder
+env: &app-env
+  DATABASE_URL: mysql://localhost:3306/dummy
+  SECRET: ci-placeholder
+  TOKEN_SECRET: ci-placeholder
+  JWT_SECRET: ci-placeholder
+  TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET: ci-placeholder
+  SMTP_HOST_RESET_PWD: ci-placeholder
+  SMTP_USER: ci-placeholder
+  SMTP_PWD: ci-placeholder
+  SMTP_USER_JUNTA: ci-placeholder
+  SMTP_PWD_JUNTA: ci-placeholder
+  SMTP_FROM: ci-placeholder
+  SMTP_FROM_JUNTA: ci-placeholder
 
 jobs:
   check-api-changes:
