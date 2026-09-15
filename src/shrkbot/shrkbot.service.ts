@@ -45,15 +45,28 @@ export class ShrkbotService implements OnModuleInit {
     }
 
     try {
-      const lineage = await this.tournamentLineage(tournamentId);
-
-      for (const tournament of lineage) {
-        await this.send('PUT', `tournaments/${tournament.id}`, {
-          tournament: buildTournamentPayload(tournament),
-        });
-      }
+      await this.pushTournaments([tournamentId]);
     } catch (error) {
       this.logger.error(`Failed to send tournament ${tournamentId} to shrkbot`, error);
+    }
+  }
+
+  async syncAdministeredTournaments(userId: bigint | number): Promise<void> {
+    if (!this.apiKey) {
+      return;
+    }
+
+    const id = BigInt(userId);
+
+    try {
+      const administered = await this.databaseService.tournament_admins.findMany({
+        where: { userId: id },
+        select: { tournamentId: true },
+      });
+
+      await this.pushTournaments(administered.map((admin) => admin.tournamentId));
+    } catch (error) {
+      this.logger.error(`Failed to send the tournaments administered by ${id} to shrkbot`, error);
     }
   }
 
@@ -103,6 +116,26 @@ export class ShrkbotService implements OnModuleInit {
       await this.send('DELETE', `games/${id}`);
     } catch (error) {
       this.logger.error(`Failed to delete game ${id} from shrkbot`, error);
+    }
+  }
+
+  private async pushTournaments(tournamentIds: number[]): Promise<void> {
+    const sent = new Set<number>();
+
+    for (const tournamentId of tournamentIds) {
+      const lineage = await this.tournamentLineage(tournamentId);
+
+      for (const tournament of lineage) {
+        if (sent.has(tournament.id)) {
+          continue;
+        }
+
+        sent.add(tournament.id);
+
+        await this.send('PUT', `tournaments/${tournament.id}`, {
+          tournament: buildTournamentPayload(tournament),
+        });
+      }
     }
   }
 

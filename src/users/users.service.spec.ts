@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UsersService } from './users.service';
 import { DatabaseService } from '../database/database.service';
+import { ShrkbotService } from '../shrkbot/shrkbot.service';
 import { UpdateUserDto } from './dto/users.dto';
 
 const USER_ID = '42';
@@ -9,6 +10,7 @@ const USER_EMAIL = 'ada@example.com';
 describe('UsersService.updateUser with a Discord User ID', () => {
   let service: UsersService;
   let update: jest.Mock;
+  let findUnique: jest.Mock;
 
   const profile: UpdateUserDto = {
     firstName: 'Ada',
@@ -24,12 +26,14 @@ describe('UsersService.updateUser with a Discord User ID', () => {
   const writtenData = () => update.mock.calls[0][0].data;
 
   beforeEach(async () => {
-    update = jest.fn().mockResolvedValue({});
+    update = jest.fn().mockResolvedValue({ id: BigInt(USER_ID) });
+    findUnique = jest.fn().mockResolvedValue({ discord_user_id: null });
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: DatabaseService, useValue: { users: { update } } },
+        { provide: DatabaseService, useValue: { users: { update, findUnique } } },
+        { provide: ShrkbotService, useValue: { syncAdministeredTournaments: jest.fn() } },
       ],
     }).compile();
 
@@ -92,6 +96,77 @@ describe('UsersService.updateUser with a Discord User ID', () => {
   });
 });
 
+describe('UsersService.updateUser and the tournaments the user administers', () => {
+  let service: UsersService;
+  let update: jest.Mock;
+  let findUnique: jest.Mock;
+  let syncAdministeredTournaments: jest.Mock;
+
+  const SNOWFLAKE = '123456789012345678';
+
+  const profile: UpdateUserDto = {
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    email: USER_EMAIL,
+  };
+
+  const stored = (discord_user_id: bigint | null) => {
+    findUnique.mockResolvedValue({ discord_user_id });
+  };
+
+  beforeEach(async () => {
+    update = jest.fn().mockResolvedValue({ id: BigInt(USER_ID) });
+    findUnique = jest.fn().mockResolvedValue({ discord_user_id: null });
+    syncAdministeredTournaments = jest.fn();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        UsersService,
+        { provide: DatabaseService, useValue: { users: { update, findUnique } } },
+        { provide: ShrkbotService, useValue: { syncAdministeredTournaments } },
+      ],
+    }).compile();
+
+    service = module.get<UsersService>(UsersService);
+  });
+
+  it('sends them when the user sets a Discord User ID', async () => {
+    await service.updateUser({ ...profile, discord_user_id: SNOWFLAKE });
+
+    expect(syncAdministeredTournaments).toHaveBeenCalledWith(BigInt(USER_ID));
+  });
+
+  it('sends them when the user clears a Discord User ID, so that shrkbot drops the access', async () => {
+    stored(BigInt(SNOWFLAKE));
+
+    await service.updateUser({ ...profile, discord_user_id: null });
+
+    expect(syncAdministeredTournaments).toHaveBeenCalled();
+  });
+
+  it('sends nothing when the submitted ID is the stored one', async () => {
+    stored(BigInt(SNOWFLAKE));
+
+    await service.updateUser({ ...profile, discord_user_id: SNOWFLAKE });
+
+    expect(syncAdministeredTournaments).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the rest of the profile changes', async () => {
+    await service.updateUser({ ...profile, firstName: 'Augusta' });
+
+    expect(syncAdministeredTournaments).not.toHaveBeenCalled();
+  });
+
+  it('sends nothing when the update fails', async () => {
+    update.mockRejectedValue(new Error('no such user'));
+
+    await service.updateUser({ ...profile, discord_user_id: SNOWFLAKE });
+
+    expect(syncAdministeredTournaments).not.toHaveBeenCalled();
+  });
+});
+
 describe('UsersService.getUserById', () => {
   let service: UsersService;
   let findFirst: jest.Mock;
@@ -125,6 +200,7 @@ describe('UsersService.getUserById', () => {
             ratings_history: { findFirst: jest.fn().mockResolvedValue(null) },
           },
         },
+        { provide: ShrkbotService, useValue: { syncAdministeredTournaments: jest.fn() } },
       ],
     }).compile();
 
