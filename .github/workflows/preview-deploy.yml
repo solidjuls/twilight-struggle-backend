@@ -2,17 +2,19 @@ name: Preview Deploy (Cloud Run)
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     branches: [main, gc-deploy]
 
 env:
   PROJECT_ID: api-cron-service
   REGION: us-central1
-  SERVICE_NAME: twilight-struggle-backend-test
   IMAGE: gcr.io/api-cron-service/twilight-struggle-backend
 
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
+    env:
+      SERVICE_NAME: twilight-struggle-backend-pr-${{ github.event.number }}
 
     steps:
       - name: Checkout
@@ -29,13 +31,13 @@ jobs:
       - name: Build and push Docker image
         run: |
           gcloud auth configure-docker
-          docker build -t ${{ env.IMAGE }}:${{ github.sha }} .
-          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker build -t ${{ env.IMAGE }}:pr-${{ github.event.number }}-${{ github.sha }} .
+          docker push ${{ env.IMAGE }}:pr-${{ github.event.number }}-${{ github.sha }}
 
-      - name: Deploy to Cloud Run (test)
+      - name: Deploy to Cloud Run (no traffic)
         run: |
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.IMAGE }}:${{ github.sha }} \
+            --image ${{ env.IMAGE }}:pr-${{ github.event.number }}-${{ github.sha }} \
             --platform managed \
             --region ${{ env.REGION }} \
             --project ${{ env.PROJECT_ID }} \
@@ -44,9 +46,24 @@ jobs:
             --memory 512Mi \
             --cpu 1 \
             --min-instances 0 \
-            --max-instances 3 \
+            --max-instances 1 \
+            --no-traffic \
             --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_TOKEN_COOKIE_NAME=__access_token__,JWT_EXPIRES_IN=60d,NEXT_PUBLIC_MAINTENANCE_MODE=false,NEXT_PUBLIC_API_URL=http://localhost:4002/api,NEXT_PUBLIC_URL=http://localhost:3000,SMTP_FROM=i.twilightstruggle@gmail.com,SMTP_USER=i.twilightstruggle@gmail.com,SMTP_USER_JUNTA=its.junta@gmail.com,SMTP_FROM_JUNTA=its.junta@gmail.com" \
             --set-secrets "DATABASE_URL=test-DATABASE_URL:latest,JWT_SECRET=test-JWT_SECRET:latest,SMTP_HOST_RESET_PWD=test-SMTP_HOST_RESET_PWD:latest,SMTP_PWD_JUNTA=test-SMTP_PWD_JUNTA:latest,TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET=test-TOKEN_RESET_PASSWORD_ENCRYPTION_SECRET:latest"
+
+      - name: Route traffic to latest revision
+        run: |
+          LATEST_REVISION=$(gcloud run revisions list \
+            --service ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --sort-by=~metadata.creationTimestamp \
+            --limit 1 \
+            --format 'value(metadata.name)')
+          gcloud run services update-traffic ${{ env.SERVICE_NAME }} \
+            --to-revisions ${LATEST_REVISION}=100 \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }}
 
       - name: Get preview URL
         id: url
@@ -62,13 +79,15 @@ jobs:
           script: |
             const url = '${{ steps.url.outputs.url }}';
             const sha = '${{ github.sha }}'.substring(0, 7);
+            const pr = '${{ github.event.number }}';
             const body = [
               '## 🚀 Preview deployed',
               '',
               `**URL:** ${url}`,
+              `**PR:** #${pr}`,
               `**Commit:** \`${sha}\``,
               '',
-              '> This preview auto-updates on every push to this PR.',
+              '> Auto-updates on every push. Service is deleted when PR closes.',
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({
