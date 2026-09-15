@@ -1,7 +1,7 @@
 /**
  * CI-only script: generates openapi.json from the NestJS app.
  *
- * Usage:  GENERATE_OPENAPI=true npx ts-node scripts/generate-spec.ts
+ * Usage:  GENERATE_OPENAPI=true npx ts-node -r tsconfig-paths/register scripts/generate-spec.ts
  *
  * Skips the DB connection, writes the spec, and exits.
  */

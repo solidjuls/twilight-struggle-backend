@@ -37,7 +37,7 @@ jobs:
         run: npm ci
 
       - name: Generate OpenAPI spec (PR)
-        run: npx ts-node scripts/generate-spec.ts
+        run: npx ts-node -r tsconfig-paths/register scripts/generate-spec.ts
         env: *app-env
         continue-on-error: true
 
@@ -59,7 +59,7 @@ jobs:
         run: npm ci || true
 
       - name: Generate OpenAPI spec (base)
-        run: npx ts-node scripts/generate-spec.ts
+        run: npx ts-node -r tsconfig-paths/register scripts/generate-spec.ts
         env: *app-env
         continue-on-error: true
 
