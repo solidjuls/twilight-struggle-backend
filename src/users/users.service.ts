@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { ShrkbotService } from '../shrkbot/shrkbot.service';
 import { hash, compare } from 'bcrypt';
 import {
   UserDto,
@@ -28,7 +29,10 @@ export function parseDiscordUserId(value?: string | null): bigint | null | undef
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly shrkbotService: ShrkbotService,
+  ) {}
 
   async checkEmailVerified(userId: string): Promise<{ verified: boolean; banned: boolean }> {
     const user = await this.databaseService.users.findFirst({
@@ -337,6 +341,11 @@ export class UsersService {
     const discordUserId = parseDiscordUserId(userData.discord_user_id);
 
     try {
+      const stored = await this.databaseService.users.findUnique({
+        where: { email: userData.email },
+        select: { discord_user_id: true },
+      });
+
       const updateData: any = {
         first_name: userData.firstName,
         last_name: userData.lastName,
@@ -355,12 +364,16 @@ export class UsersService {
         updateData.password = await hash(userData.password, 12);
       }
 
-      await this.databaseService.users.update({
+      const updated = await this.databaseService.users.update({
         where: {
           email: userData.email,
         },
         data: updateData,
       });
+
+      if (discordUserId !== undefined && discordUserId !== (stored?.discord_user_id ?? null)) {
+        await this.shrkbotService.syncAdministeredTournaments(updated.id);
+      }
 
       return { success: true };
     } catch (error) {
