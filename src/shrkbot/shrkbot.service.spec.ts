@@ -53,6 +53,7 @@ describe('ShrkbotService', () => {
   let service: ShrkbotService;
   let findUnique: jest.Mock;
   let findGame: jest.Mock;
+  let findAdministered: jest.Mock;
   let fetchMock: jest.Mock;
   let logError: jest.SpyInstance;
 
@@ -62,7 +63,11 @@ describe('ShrkbotService', () => {
         ShrkbotService,
         {
           provide: DatabaseService,
-          useValue: { tournaments: { findUnique }, game_results: { findUnique: findGame } },
+          useValue: {
+            tournaments: { findUnique },
+            game_results: { findUnique: findGame },
+            tournament_admins: { findMany: findAdministered },
+          },
         },
         { provide: ConfigService, useValue: { get: (key: string) => config[key] } },
       ],
@@ -80,6 +85,7 @@ describe('ShrkbotService', () => {
   beforeEach(async () => {
     findUnique = jest.fn().mockImplementation(({ where }) => Promise.resolve(row(where.id)));
     findGame = jest.fn().mockResolvedValue(gameRow());
+    findAdministered = jest.fn().mockResolvedValue([{ tournamentId: 7 }]);
     fetchMock = jest.fn().mockResolvedValue({ ok: true, status: 200, text: async () => '' });
     global.fetch = fetchMock as unknown as typeof fetch;
     logError = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -159,6 +165,60 @@ describe('ShrkbotService', () => {
       fetchMock.mockRejectedValue(new Error('connect ECONNREFUSED'));
 
       await expect(service.syncTournament(7)).resolves.toBeUndefined();
+      expect(logError).toHaveBeenCalled();
+    });
+  });
+
+  describe('syncAdministeredTournaments', () => {
+    const lineage = (parents: Record<number, number | null>) => {
+      findUnique.mockImplementation(({ where }) => Promise.resolve(row(where.id, parents[where.id])));
+    };
+
+    it('looks the tournaments up by the user', async () => {
+      await service.syncAdministeredTournaments(BigInt(42));
+
+      expect(findAdministered).toHaveBeenCalledWith({
+        where: { userId: BigInt(42) },
+        select: { tournamentId: true },
+      });
+    });
+
+    it('puts every tournament the user administers', async () => {
+      findAdministered.mockResolvedValue([{ tournamentId: 7 }, { tournamentId: 9 }]);
+
+      await service.syncAdministeredTournaments(42);
+
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        `${API_URL}/tournaments/7`,
+        `${API_URL}/tournaments/9`,
+      ]);
+    });
+
+    it('puts a shared ancestor once', async () => {
+      findAdministered.mockResolvedValue([{ tournamentId: 2 }, { tournamentId: 3 }]);
+      lineage({ 1: null, 2: 1, 3: 1 });
+
+      await service.syncAdministeredTournaments(42);
+
+      expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+        `${API_URL}/tournaments/1`,
+        `${API_URL}/tournaments/2`,
+        `${API_URL}/tournaments/3`,
+      ]);
+    });
+
+    it('sends nothing for a user who administers nothing', async () => {
+      findAdministered.mockResolvedValue([]);
+
+      await service.syncAdministeredTournaments(42);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('logs a rejected request instead of throwing', async () => {
+      fetchMock.mockResolvedValue({ ok: false, status: 422, text: async () => 'unknown parent' });
+
+      await expect(service.syncAdministeredTournaments(42)).resolves.toBeUndefined();
       expect(logError).toHaveBeenCalled();
     });
   });
@@ -300,6 +360,13 @@ describe('ShrkbotService', () => {
     it('sends no game deletion', async () => {
       await service.deleteGame(GAME_ID);
 
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('sends no administered tournament, and reads none', async () => {
+      await service.syncAdministeredTournaments(42);
+
+      expect(findAdministered).not.toHaveBeenCalled();
       expect(fetchMock).not.toHaveBeenCalled();
     });
   });

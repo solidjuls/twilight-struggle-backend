@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { ShrkbotService } from '../shrkbot/shrkbot.service';
 import { hash, compare } from 'bcrypt';
 import {
   UserDto,
@@ -28,7 +29,10 @@ export function parseDiscordUserId(value?: string | null): bigint | null | undef
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly shrkbotService: ShrkbotService,
+  ) {}
 
   async getPlayerIdsByCountry(countryId: string): Promise<string[]> {
     const users = await this.databaseService.users.findMany({
@@ -317,7 +321,12 @@ export class UsersService {
     const discordUserId = parseDiscordUserId(userData.discord_user_id);
 
     try {
-      await this.databaseService.users.update({
+      const stored = await this.databaseService.users.findUnique({
+        where: { email: userData.email },
+        select: { discord_user_id: true },
+      });
+
+      const updated = await this.databaseService.users.update({
         where: {
           email: userData.email,
         },
@@ -334,6 +343,10 @@ export class UsersService {
           country_id: userData.country,
         },
       });
+
+      if (discordUserId !== undefined && discordUserId !== (stored?.discord_user_id ?? null)) {
+        await this.shrkbotService.syncAdministeredTournaments(updated.id);
+      }
 
       return { success: true };
     } catch (error) {
