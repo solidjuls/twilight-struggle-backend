@@ -1,4 +1,4 @@
-export interface PlayerRatingDto {
+export class PlayerRatingDto {
   id: string;
   rank: number;
   name: string;
@@ -10,19 +10,19 @@ export interface PlayerRatingDto {
   playdek_name?: string;
 }
 
-export interface PlayerRatingHistoryDto {
+export class PlayerRatingHistoryDto {
   userId: string;
   fromDate: number;
 }
 
-export interface PlayerRatingListResponse {
+export class PlayerRatingListResponse {
   results: PlayerRatingDto[];
   totalRows: number;
   currentPage: number;
   totalPages: number;
 }
 
-export interface GetPlayerRatingsQueryDto {
+export class GetPlayerRatingsQueryDto {
   // Pagination (legacy parameters)
   p?: string; // page
   pso?: string; // page size

@@ -2,8 +2,13 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import * as cookieParser from 'cookie-parser';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
+  console.log('DATABASE_URL is set:', !!process.env.DATABASE_URL);
+  console.log('DATABASE_URL length:', process.env.DATABASE_URL?.length);
+  console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 30));
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Configure body parser to handle large payloads (for CSV uploads)
@@ -21,12 +26,16 @@ async function bootstrap() {
   // Enable cookie parser for JWT authentication
   app.use(cookieParser());
 
+  console.log('DATABASE_URL set:', !!process.env.DATABASE_URL, process.env.DATABASE_URL);
+
   // Get allowed origins from environment variable or use defaults
   const allowedOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map(origin => origin.trim())
     : ['http://localhost:3000', 'http://localhost:3001'];
 
   const vercelDomainRegex = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*vercel\.app$/i;
+  const cloudRunDomainRegex = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*run\.app$/i;
+  const firebaseDomainRegex = /^https?:\/\/(?:[a-zA-Z0-9-]+\.)*(web\.app|firebaseapp\.com)$/i;
 
 
   // Enable CORS for frontend communication
@@ -37,21 +46,18 @@ async function bootstrap() {
       if (!origin) {
         return callback(null, true);
       }
-      
+
       // 2. Check if the origin is in the explicit allowed list
       if (allowedOrigins.includes(origin)) {
-        // console.log(`CORS Success: Origin "${origin}" allowed by static list.`); // Optional: Success log
-        return callback(null, true);
-      }
-      
-      // 3. Check if the origin matches the Vercel dynamic domain pattern
-      if (vercelDomainRegex.test(origin)) {
-        // console.log(`CORS Success: Origin "${origin}" allowed by regex.`); // Optional: Success log
         return callback(null, true);
       }
 
-      // 4. If none of the above passed, the request is rejected. Log the failure.
-      // Use console.error or a proper NestJS logger for visibility.
+      // 3. Check if the origin matches known hosting patterns
+      if (vercelDomainRegex.test(origin) || cloudRunDomainRegex.test(origin) || firebaseDomainRegex.test(origin)) {
+        return callback(null, true);
+      }
+
+      // 4. If none of the above passed, the request is rejected.
       console.error(`CORS Failure: Origin "${origin}" rejected. Does not match static list or regex pattern.`);
       
       // Reject the origin
@@ -64,6 +70,17 @@ async function bootstrap() {
 
   // Global prefix for all routes
   app.setGlobalPrefix('api');
+
+  // Swagger UI (dev only, or when explicitly enabled)
+  if (process.env.ENABLE_SWAGGER === 'true' || process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Twilight Struggle API')
+      .setDescription('API contract for the Twilight Struggle backend')
+      .setVersion('1.0')
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.PORT || 4002;
   await app.listen(port);

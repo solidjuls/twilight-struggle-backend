@@ -1,15 +1,15 @@
-export interface UserDto {
+export class UserDto {
   id: string;
   name: string;
   countryCode?: string;
   rating?: number;
 }
 
-export interface UserWithEmailDto extends UserDto {
+export class UserWithEmailDto extends UserDto {
   email: string;
 }
 
-export interface UserDetailDto {
+export class UserDetailDto {
   id: string;
   first_name: string;
   last_name: string;
@@ -33,7 +33,7 @@ export interface UserDetailDto {
   rating?: number;
 }
 
-export interface GetUsersQueryDto {
+export class GetUsersQueryDto {
   tournamentId?: string;
   page?: string;
   pageSize?: string;
@@ -46,14 +46,14 @@ export interface GetUsersQueryDto {
   pso?: string;
 }
 
-export interface UsersListResponse {
+export class UsersListResponse {
   results: UserDto[];
   totalRows: number;
   currentPage: number;
   totalPages: number;
 }
 
-export interface CreateUserDto {
+export class CreateUserDto {
   first_name: string;
   last_name: string;
   playdek_name: string;
@@ -65,7 +65,7 @@ export interface CreateUserDto {
   country?: number;
 }
 
-export interface UpdateUserDto {
+export class UpdateUserDto {
   firstName?: string;
   lastName?: string;
   playdek_name?: string;
@@ -78,12 +78,12 @@ export interface UpdateUserDto {
   country?: number;
 }
 
-export interface UpdatePasswordDto {
+export class UpdatePasswordDto {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
 }
 
-export interface BanUserDto {
+export class BanUserDto {
   banned: boolean;
 }

@@ -1,4 +1,4 @@
-export interface TournamentDto {
+export class TournamentDto {
   id: string;
   tournament_name: string;
   status_id: number;
@@ -11,7 +11,7 @@ export interface TournamentDto {
   updated_at?: Date | null;
 }
 
-export interface RegisteredPlayerDto {
+export class RegisteredPlayerDto {
   registrationId: number;
   email: string;
   registeredAt: Date;
@@ -20,7 +20,7 @@ export interface RegisteredPlayerDto {
   countryCode?: string;
 }
 
-export interface RegisteredPlayerPublicDto {
+export class RegisteredPlayerPublicDto {
   registrationId: number;
   status: string;
   registeredAt: Date;
@@ -29,7 +29,7 @@ export interface RegisteredPlayerPublicDto {
   countryCode?: string;
 }
 
-export interface WaitlistPlayerDto {
+export class WaitlistPlayerDto {
   waitlistId: number;
   email: string; // Will be empty string for non-admin users
   waitlistedAt: Date;
@@ -38,7 +38,7 @@ export interface WaitlistPlayerDto {
   countryCode?: string;
 }
 
-export interface WaitlistPlayerPublicDto {
+export class WaitlistPlayerPublicDto {
   waitlistId: number;
   waitlistedAt: Date;
   userId?: string;
@@ -46,13 +46,13 @@ export interface WaitlistPlayerPublicDto {
   countryCode?: string;
 }
 
-export interface GetTournamentsQueryDto {
+export class GetTournamentsQueryDto {
   id?: string;
   status?: string;
   players?: string;
 }
 
-export interface CreateTournamentDto {
+export class CreateTournamentDto {
   tournamentName: string;
   status: number;
   waitlist?: boolean;
@@ -61,7 +61,7 @@ export interface CreateTournamentDto {
   description?: string;
 }
 
-export interface UpdateTournamentDto {
+export class UpdateTournamentDto {
   id: number;
   tournamentName?: string;
   status?: number;
@@ -70,33 +70,33 @@ export interface UpdateTournamentDto {
   description?: string;
 }
 
-export interface RegisterTournamentDto {
+export class RegisterTournamentDto {
   id: number;
   userId: string;
 }
 
-export interface AddTournamentAdminDto {
+export class AddTournamentAdminDto {
   tournamentId: number;
   userId: string;
 }
 
-export interface RemoveTournamentAdminDto {
+export class RemoveTournamentAdminDto {
   tournamentId: number;
   userId: string;
 }
 
-export interface TournamentAdminDto {
+export class TournamentAdminDto {
   userId: string;
   name: string;
   email?: string; // Only for admins viewing
 }
 
-export interface UpdateTournamentStatusDto {
+export class UpdateTournamentStatusDto {
   tournamentId: number;
   status: number; // 2=START_REGISTRATION, 3=CLOSE_REGISTRATION, 4=START_TOURNAMENT, 5=CLOSE_TOURNAMENT
 }
 
-export interface CreateSubtournamentDto {
+export class CreateSubtournamentDto {
   tournamentName: string;
   description?: string;
   startingDate?: Date;

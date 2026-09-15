@@ -1,0 +1,44 @@
+name: Preview Cleanup (Cloud Run)
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main, gc-deploy]
+
+env:
+  PROJECT_ID: api-cron-service
+  REGION: us-central1
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      SERVICE_NAME: twilight-struggle-backend-pr-${{ github.event.number }}
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Delete preview service
+        run: |
+          gcloud run services delete ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --project ${{ env.PROJECT_ID }} \
+            --quiet || echo "Service already deleted or does not exist"
+
+      - name: Post cleanup comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = '## 🧹 Preview environment cleaned up\n\nThe Cloud Run service for this PR has been deleted.';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
