@@ -132,6 +132,7 @@ export class ScheduleService {
   async getTournamentIdsWithSchedulesForUser(userId: number): Promise<Set<number>> {
     const schedules = await this.databaseService.schedule.findMany({
       where: {
+        game_results_id: null ,
         OR: [
           { usa_player_id: userId },
           { ussr_player_id: userId },

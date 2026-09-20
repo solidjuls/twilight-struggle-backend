@@ -59,7 +59,6 @@ export class ScheduleController {
         adminTournaments.map(t => this.tournamentsService.getChildTournaments([Number(t.id)])),
       )
     ).flat();
-console.log("adminChildren", adminChildren)
     const merged = [
       ...ongoingWithSchedules,
       ...adminChildren.map(c => ({ id: c.id.toString(), tournament_name: c.tournament_name } as TournamentDto)),
