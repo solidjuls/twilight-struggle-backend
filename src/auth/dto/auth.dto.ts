@@ -37,40 +37,6 @@ export interface ResetPasswordDto {
   newPassword?: string;
 }
 
-export interface CreateUserDto {
-  email: string;
-  password: string;
-  playdek_name: string;
-  first_name?: string;
-  last_name?: string;
-  role_id?: number;
-}
-
-export interface RegisterUserDto {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  firstName: string;
-  lastName: string;
-  playdek_name: string;
-  countryId?: string;
-  cityId?: string;
-  phoneNumber?: string;
-  preferredGamingPlatform?: string;
-  preferredGameDuration?: string;
-}
-
-export interface RegisterUserResponse {
-  success: boolean;
-  message: string;
-  user: {
-    name: string;
-    email: string;
-    id: string;
-    role: number;
-  };
-}
-
 export interface EmailVerifyRequestDto {
   email: string;
 }

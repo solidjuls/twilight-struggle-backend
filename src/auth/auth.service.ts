@@ -4,7 +4,7 @@ import { compare, hash } from 'bcryptjs';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { EmailService, SMTPConfig } from '../email/email.service';
-import { LoginDto, AuthResponseDto, JwtPayloadDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, RegisterUserResponse, EmailVerifyRequestDto, EmailVerifyConfirmDto, EmailVerifyResponse } from './dto/auth.dto';
+import { LoginDto, AuthResponseDto, JwtPayloadDto, ResetPasswordDto, EmailVerifyRequestDto, EmailVerifyConfirmDto, EmailVerifyResponse } from './dto/auth.dto';
 
 const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -275,114 +275,6 @@ export class AuthService {
     } catch (error) {
       throw new BadRequestException('Invalid token');
     }
-  }
-
-  async createUser(createUserDto: CreateUserDto): Promise<{ success: boolean; user?: AuthResponseDto }> {
-    const { email, password, playdek_name, first_name, last_name, role_id } = createUserDto;
-
-    // Check if user already exists
-    const existingUser = await this.databaseService.users.findFirst({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new BadRequestException(`User with email ${email} already exists`);
-    }
-
-    // Hash the password
-    const hashedPassword = await hash(password, 12);
-
-    // Create the user
-    const newUser = await this.databaseService.users.create({
-      data: {
-        email,
-        password: hashedPassword,
-        playdek_name: playdek_name,
-        first_name: first_name,
-        last_name: last_name,
-        role_id: role_id || 3,
-      },
-    });
-
-    // Prepare response
-    const userResponse: AuthResponseDto = {
-      name: newUser.first_name!,
-      email: newUser.email!,
-      id: newUser.id.toString(),
-      role: newUser.role_id || 3,
-    };
-
-    return { success: true, user: userResponse };
-  }
-
-  async registerUser(registerDto: RegisterUserDto): Promise<RegisterUserResponse> {
-    const {
-      email,
-      password,
-      confirmPassword,
-      firstName,
-      lastName,
-      playdek_name,
-      countryId,
-      cityId,
-      phoneNumber,
-      preferredGamingPlatform,
-      preferredGameDuration
-    } = registerDto;
-
-    // Validate password confirmation
-    if (password !== confirmPassword) {
-      throw new BadRequestException('Passwords do not match');
-    }
-
-    // Check if user already exists
-    const existingUser = await this.databaseService.users.findFirst({
-      where: { email },
-    });
-
-    if (existingUser) {
-      throw new BadRequestException('User with this email already exists');
-    }
-
-    // Hash password
-    const hashedPassword = await hash(password, 12);
-
-    // Create user with provided fields and defaults for missing required fields
-    const newUser = await this.databaseService.users.create({
-      data: {
-        email,
-        password: hashedPassword,
-        playdek_name: playdek_name,
-        first_name: firstName,
-        last_name: lastName,
-        role_id: 3, // Default to player role
-        created_at: new Date(),
-        updated_at: new Date(),
-        // Use provided fields or defaults
-        country_id: countryId ? BigInt(countryId) : null,
-        city_id: cityId ? BigInt(cityId) : null,
-        phone_number: phoneNumber || null,
-        preferred_gaming_platform: preferredGamingPlatform || null,
-        preferred_game_duration: preferredGameDuration || null,
-        // Defaults for other required fields
-        timezone_id: null,
-        last_login_at: null,
-      },
-    });
-
-    // Prepare response
-    const userResponse: AuthResponseDto = {
-      name: firstName,
-      email: newUser.email!,
-      id: newUser.id.toString(),
-      role: newUser.role_id || 3,
-    };
-
-    return {
-      success: true,
-      message: 'User registered successfully',
-      user: userResponse
-    };
   }
 
   async requestEmailVerification(email: string): Promise<EmailVerifyResponse> {

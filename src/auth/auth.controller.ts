@@ -1,6 +1,6 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Get, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { LoginDto, ImpersonateDto, ResetPasswordDto, CreateUserDto, RegisterUserDto, EmailVerifyRequestDto, EmailVerifyConfirmDto } from './dto/auth.dto';
+import { LoginDto, ImpersonateDto, ResetPasswordDto, EmailVerifyRequestDto, EmailVerifyConfirmDto } from './dto/auth.dto';
 import { Public, CurrentUser } from './decorators/auth.decorators';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
@@ -24,13 +24,6 @@ export class AuthController {
     // Token invalidation would be handled client-side by removing the token
     // For server-side invalidation, you would need a token blacklist
     return { success: true };
-  }
-
-  @Public()
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(@Body() registerDto: RegisterUserDto) {
-    return await this.authService.registerUser(registerDto);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -74,13 +67,6 @@ export class AuthController {
     }
 
     return { success: false };
-  }
-
-  @Public()
-  @Post('create-user')
-  @HttpCode(HttpStatus.CREATED)
-  async createUser(@Body() createUserDto: CreateUserDto) {
-    return this.authService.createUser(createUserDto);
   }
 
   @Public()
