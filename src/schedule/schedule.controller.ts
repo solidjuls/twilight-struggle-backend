@@ -59,10 +59,11 @@ export class ScheduleController {
         adminTournaments.map(t => this.tournamentsService.getChildTournaments([Number(t.id)])),
       )
     ).flat();
-
+console.log("adminChildren", adminChildren)
     const merged = [
       ...ongoingWithSchedules,
       ...adminChildren.map(c => ({ id: c.id.toString(), tournament_name: c.tournament_name } as TournamentDto)),
+      ...adminTournaments
     ];
 
     return merged.filter((t, i, self) => self.findIndex(x => x.id === t.id) === i);
@@ -89,7 +90,7 @@ export class ScheduleController {
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
       const allUserTournaments = await this.buildAllUserTournaments(ongoingUserTournaments, userAdminTournaments, Number(user.id));
-
+console.log("allUserTournaments", allUserTournaments, userAdminTournaments)
       let tournamentIds: string[];
 
       if (tournamentId) {
@@ -130,32 +131,32 @@ export class ScheduleController {
     }
   }
 
-    @Get('players-with-missing-games')
-    async playersWithMissingGames(
-      @Query() query: any,
-      @CurrentUser() user: JwtPayloadDto,
-    ) {
-      try {
-        const { tid } = query;
-        const id = parseInt(tid);
-        console.log("tournamentId", id, tid, query);
-  
-        // const targetGames = body.targetGamesPerPlayer || 20;
-        const result = await this.scheduleService.getPlayersWithMissingGames(id, 20);
-  
-        return {
-          success: true,
-          message: 'Missing schedule pairs created',
-          ...result
-        };
-      } catch (error) {
-        console.error("CREATE MISSING PAIRS API Error:", error);
-        throw new HttpException(
-          error.message || 'Failed to create missing pairs',
-          error.status || HttpStatus.INTERNAL_SERVER_ERROR,
-        );
-      }
+  @Get('players-with-missing-games')
+  async playersWithMissingGames(
+    @Query() query: any,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    try {
+      const { tid } = query;
+      const id = parseInt(tid);
+      console.log("tournamentId", id, tid, query);
+
+      // const targetGames = body.targetGamesPerPlayer || 20;
+      const result = await this.scheduleService.getPlayersWithMissingGames(id, 20);
+
+      return {
+        success: true,
+        message: 'Missing schedule pairs created',
+        ...result
+      };
+    } catch (error) {
+      console.error("CREATE MISSING PAIRS API Error:", error);
+      throw new HttpException(
+        error.message || 'Failed to create missing pairs',
+        error.status || HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
+  }
 
   @Post()
   async updateScheduleOrSubmit(
