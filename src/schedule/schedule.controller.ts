@@ -89,13 +89,14 @@ export class ScheduleController {
       const ongoingUserTournaments = userTournaments.filter(t => t.status_id === 4);
       const userAdminTournaments = await this.tournamentsService.getUserAdminTournaments(user.id.toString());
       const allUserTournaments = await this.buildAllUserTournaments(ongoingUserTournaments, userAdminTournaments, Number(user.id));
-console.log("allUserTournaments", allUserTournaments, userAdminTournaments)
+      const defaultTournament = allUserTournaments[0].id
+
       let tournamentIds: string[];
 
       if (tournamentId) {
         tournamentIds = await this.resolveWithChildTournaments(tournamentId.split(','));
-      } else if (ongoingUserTournaments.length > 0) {
-        tournamentIds = await this.resolveWithChildTournaments([ongoingUserTournaments[0].id.toString()]);
+      } else if (defaultTournament) {
+        tournamentIds = await this.resolveWithChildTournaments([defaultTournament]);
       } else {
         return {
           results: [],
@@ -119,7 +120,7 @@ console.log("allUserTournaments", allUserTournaments, userAdminTournaments)
       return {
         ...result,
         userTournaments: allUserTournaments,
-        defaultTournament: tournamentIds[0],
+        defaultTournament,
       };
     } catch (error) {
       console.error('[Schedule GET]', error);
