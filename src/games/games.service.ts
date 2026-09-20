@@ -225,6 +225,12 @@ export class GamesService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: { parent_id: tId },
+      select: { id: true },
+    });
+    const allTournamentIds = [tId, ...childTournaments.map(t => t.id)];
+
     const games = await this.databaseService.game_results.findMany({
       select: {
         id: true,
@@ -233,7 +239,7 @@ export class GamesService {
         ussr_player_id: true
       },
       where: {
-        tournament_id: tId,
+        tournament_id: { in: allTournamentIds },
         game_date: {
           gte: thirtyDaysAgo
         },
