@@ -25,7 +25,6 @@ import {
 } from './dto/game.dto';
 import { ScheduleService } from 'src/schedule/schedule.service';
 import { PlayoffsService } from 'src/playoffs/playoffs.service';
-import { EmailService, SMTPConfig } from 'src/email/email.service';
 import { UsersService } from 'src/users/users.service';
 import { UserDetailDto } from 'src/users/dto/users.dto';
 
@@ -36,7 +35,6 @@ export class GamesController {
     private readonly gamesService: GamesService,
     private readonly scheduleService: ScheduleService,
     private readonly playoffsService: PlayoffsService,
-    private readonly emailService: EmailService,
     private readonly usersService: UsersService
 
   ) {}
@@ -241,12 +239,8 @@ export class GamesController {
     return winnerId;
   }
 
-  async updateITSLPlayoffSchedule(data: SubmitGameDto, due_date: Date, bestOf: number) {
-    const userId = data.gameWinner === "1" ? BigInt(data.usaPlayerId) : BigInt(data.ussrPlayerId)
-    const tId = data.tournamentId
-
+  async updateGamesScheduleWithBestOf(data: SubmitGameDto, due_date: Date, bestOf: number) {
     // Check best_of_games
-    // const BO = 3// await this.playoffsService.getBOFromPlayoff(userId, tId)
     let winnerId = null;
     if (bestOf > 1) {
       // Select on game_results games 30 days old by tId, the 2 players
@@ -269,19 +263,6 @@ export class GamesController {
         )
       }
     }
-    const smtpConfig: SMTPConfig = {
-      host: process.env.SMTP_HOST || 'localhost',
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      user: process.env.SMTP_USER_JUNTA || '',
-      password: process.env.SMTP_PWD_JUNTA || '',
-    };
-
-    await this.emailService.sendPlayoffsEmailAdminNotification(
-      ['juli.arnalot@gmail.com'],
-      winnerId,
-      smtpConfig
-    );
   }
 
   @Post('submit')
@@ -321,10 +302,8 @@ export class GamesController {
           scheduleId: Number(submitGameRequest.data.scheduleId),
         });
         
-        // if tournament is ITSL main playoff
-        // if (["347","345"].includes(data.tournamentId)) {
         if (updatedSchedule.best_of) {
-          this.updateITSLPlayoffSchedule(data, updatedSchedule.due_date, updatedSchedule.best_of)
+          this.updateGamesScheduleWithBestOf(data, updatedSchedule.due_date, updatedSchedule.best_of)
         }
       }
       return result;

@@ -225,6 +225,12 @@ export class GamesService {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    const childTournaments = await this.databaseService.tournaments.findMany({
+      where: { parent_id: tId },
+      select: { id: true },
+    });
+    const allTournamentIds = [tId, ...childTournaments.map(t => t.id)];
+
     const games = await this.databaseService.game_results.findMany({
       select: {
         id: true,
@@ -233,7 +239,7 @@ export class GamesService {
         ussr_player_id: true
       },
       where: {
-        tournament_id: tId,
+        tournament_id: { in: allTournamentIds },
         game_date: {
           gte: thirtyDaysAgo
         },
@@ -406,7 +412,6 @@ export class GamesService {
 
           // Add to log table
           await this.addGameToLogTable(prismaTransaction, oldGameDate, emailReporter);
-          console.log('oldGameDate', oldGameDate);
 
           // Check if only metadata changed (no rating recalculation needed)
           if (
@@ -459,8 +464,6 @@ export class GamesService {
             ],
           });
 
-          console.log('allGamesAffected', allGamesAffected);
-
           // Delete all rating history for affected games
           const ids = allGamesAffected.map((game) => game.id);
           const deletedMany = await prismaTransaction.ratings_history.deleteMany({
@@ -470,8 +473,6 @@ export class GamesService {
               },
             },
           });
-
-          console.log('deletedMany', deletedMany);
 
           // Recreate ratings for all affected games
           for (const game of allGamesAffected) {
@@ -487,8 +488,6 @@ export class GamesService {
                 gameType: input.tournamentId,
                 prismaTransaction,
               });
-
-              console.log('new rating created for updated game', usaRating, ussrRating);
 
               // Update the game with new data
               await prismaTransaction.game_results.update({
@@ -524,8 +523,6 @@ export class GamesService {
                 prismaTransaction,
               });
 
-              console.log('new rating created for affected game', usaRating, ussrRating);
-
               // Update previous ratings
               await prismaTransaction.game_results.update({
                 data: {
@@ -536,7 +533,6 @@ export class GamesService {
                   id: game.id,
                 },
               });
-              console.log('affected game updated');
             }
           }
         },
@@ -635,8 +631,6 @@ export class GamesService {
             },
           });
 
-          console.log('deletedMany', deletedMany);
-
           // Recreate ratings for all affected games
           for (const game of allGamesAffected) {
             if (game.id.toString() === input.oldId) {
@@ -653,8 +647,6 @@ export class GamesService {
                 gameType: game.tournament_id?.toString() as string,
                 prismaTransaction,
               });
-
-              console.log('new rating created for affected game', usaRating, ussrRating);
 
               // Update previous ratings
               await prismaTransaction.game_results.update({
@@ -752,8 +744,6 @@ export class GamesService {
       tournamentId: gameType,
       prismaTransaction,
     });
-
-    console.log('newUsaRating, newUssrRating', gameId, newUsaRating, newUssrRating);
 
     // Create rating history entries
     await prismaTransaction.ratings_history.createMany({

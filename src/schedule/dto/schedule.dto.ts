@@ -18,24 +18,15 @@ export interface ScheduleDto {
 }
 
 export interface GetSchedulesQueryDto {
-  userId?: string; // User ID to filter schedules
-  tournamentId?: string; // Tournament ID to filter schedules
-  page?: string; // Page number for pagination
-  pageSize?: string; // Number of items per page
-  onlyPending?: string; // Filter only pending games (without results) - 'true' or 'false'
-  orderBy?: 'dueDate' | 'gameDate' | 'tournamentName'; // Field to order by
-  orderDirection?: 'asc' | 'desc'; // Order direction
-
-  // Legacy parameters for backward compatibility
-  uid?: string; // userId (legacy)
-  t?: string; // tournament IDs (comma-separated) (legacy)
-  u?: string; // userFilter (legacy)
-  p?: string; // page (legacy)
-  pso?: string; // pageSize (legacy)
-  a?: string; // adminView (1 or 0) (legacy)
+  tournamentId?: string;
+  userId?: string; // view another user's schedule
+  fullSchedule?: boolean; // view full tournament schedule
+  page?: string;
+  pageSize?: string;
 }
 
 export interface CreateScheduleDto {
+  scheduleId?: number; // existing schedule ID — if present, updates instead of creating
   usa: string; // USA player ID
   ussr: string; // USSR player ID
   t: number; // tournament ID
@@ -43,6 +34,7 @@ export interface CreateScheduleDto {
   r: boolean; // is random
   gc: string; // game code
   randomSides?: boolean; // random sides
+  best_of?: 1 | 3 | 5 | 7 | null;
 }
 
 export interface CsvScheduleRow {

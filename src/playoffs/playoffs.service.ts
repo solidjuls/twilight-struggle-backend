@@ -9,7 +9,6 @@ import {
   UpdatePlayoffWinnerDto,
   UpdatePlayoffWinnerResultDto,
 } from './dto/playoffs.dto';
-import { find } from 'rxjs';
 
 const PLAYOFF_MATCHUP_DUE_DAYS = 7;
 

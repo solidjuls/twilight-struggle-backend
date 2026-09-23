@@ -227,8 +227,8 @@ export class StandingsService {
 
     // WE START CALCULATING PLAYOFFS
     // Filter by division 
-    const filteredPlayersByDivision = Object.values(players).filter(player => 
-      division ? player.secondaryName === division : true
+    const filteredPlayersByDivision = Object.values(players).filter(player =>
+      player.secondaryName !== 'Forfeit' && (division ? player.secondaryName === division : true)
     );
 
     // Sort players by SoS
