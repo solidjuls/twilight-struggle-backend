@@ -77,30 +77,30 @@ export class ScheduleService {
       },
     };
 
-    const unplayedCount = await this.databaseService.schedule.count({
-      where: { ...baseWhere, game_results_id: null },
-    });
-    const playedCount = await this.databaseService.schedule.count({
-      where: { ...baseWhere, game_results_id: { not: null } },
-    });
-    const totalRows = unplayedCount + playedCount;
+    // Cheap count for total rows
+    const totalCount = await this.databaseService.schedule.count({ where: baseWhere });
+    const totalPages = Math.ceil(totalCount / pageSize);
 
-    const unplayed = await this.databaseService.schedule.findMany({
+    // Fetch paginated results
+    const schedules = await this.databaseService.schedule.findMany({
       select: selectFields,
-      where: { ...baseWhere, game_results_id: null },
-      orderBy: [{ due_date: 'asc' }, { id: 'asc' }],
+      where: baseWhere,
+      skip,
+      take: pageSize,
     });
 
-    const played = await this.databaseService.schedule.findMany({
-      select: selectFields,
-      where: { ...baseWhere, game_results_id: { not: null } },
-      orderBy: [{ game_results: { game_date: 'asc' } }, { id: 'asc' }],
-    });
+    const results: ScheduleDto[] = schedules.map(this.mapScheduleResult);
 
-    const combined = [...unplayed, ...played];
-    const paginatedResults = combined.slice(skip, skip + pageSize);
+    return {
+      results,
+      totalRows: totalCount,
+      currentPage: page,
+      totalPages,
+    };
+  }
 
-    const results: ScheduleDto[] = paginatedResults.map(result => ({
+  private mapScheduleResult(result: any): ScheduleDto {
+    return {
       gameWinner: result.game_results?.game_winner || null,
       gameDate: result.game_results?.game_date?.toISOString() || null,
       dueDate: result.due_date.toISOString(),
@@ -117,15 +117,6 @@ export class ScheduleService {
       idUssr: result.users_schedule_ussr_player_idTousers?.id?.toString() || '',
       tournamentName: result.tournaments.tournament_name,
       tournamentId: result.tournaments.id.toString(),
-    }));
-
-    const totalPages = Math.ceil(totalRows / pageSize);
-
-    return {
-      results,
-      totalRows,
-      currentPage: page,
-      totalPages,
     };
   }
 
