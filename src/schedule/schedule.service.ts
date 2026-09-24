@@ -38,6 +38,7 @@ export class ScheduleService {
         tournamentFilter,
         ...(userFilter ? [userFilter] : []),
       ],
+      game_results_id: null,
     };
 
     const selectFields = {
@@ -88,7 +89,6 @@ export class ScheduleService {
       skip,
       take: pageSize,
     });
-
     const results: ScheduleDto[] = schedules.map(this.mapScheduleResult);
 
     return {
