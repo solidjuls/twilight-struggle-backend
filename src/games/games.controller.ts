@@ -303,7 +303,7 @@ export class GamesController {
         });
         
         if (updatedSchedule.best_of) {
-          this.updateGamesScheduleWithBestOf(data, updatedSchedule.due_date, updatedSchedule.best_of)
+          // this.updateGamesScheduleWithBestOf(data, updatedSchedule.due_date, updatedSchedule.best_of)
         }
       }
       return result;

@@ -454,23 +454,23 @@ export class TournamentsService {
     });
 
     // Map child tournaments to DTOs
-    const childDtos = childTournaments.map(tournament => ({
-      id: tournament.id.toString(),
-      tournament_name: tournament.tournament_name,
-      status_id: tournament.status_id,
-      waitlist: tournament.waitlist,
-      starting_date: tournament.starting_date,
-      description: tournament.description,
-      created_at: tournament.created_at,
-      updated_at: tournament.updated_at,
-      adminId: tournament.tournament_admins.map(admin => admin.users.id.toString()),
-      adminName: tournament.tournament_admins.map(admin =>
-        `${admin.users.first_name} ${admin.users.last_name}`
-      ),
-    }));
+    // const childDtos = childTournaments.map(tournament => ({
+    //   id: tournament.id.toString(),
+    //   tournament_name: tournament.tournament_name,
+    //   status_id: tournament.status_id,
+    //   waitlist: tournament.waitlist,
+    //   starting_date: tournament.starting_date,
+    //   description: tournament.description,
+    //   created_at: tournament.created_at,
+    //   updated_at: tournament.updated_at,
+    //   adminId: tournament.tournament_admins.map(admin => admin.users.id.toString()),
+    //   adminName: tournament.tournament_admins.map(admin =>
+    //     `${admin.users.first_name} ${admin.users.last_name}`
+    //   ),
+    // }));
 
     // Combine and deduplicate by id
-    const allTournaments = [...directAdminDtos, ...childDtos];
+    const allTournaments = [...directAdminDtos]//, ...childDtos];
     const uniqueTournaments = allTournaments.filter((tournament, index, self) =>
       index === self.findIndex(t => t.id === tournament.id)
     );

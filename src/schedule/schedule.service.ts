@@ -272,17 +272,7 @@ export class ScheduleService {
     bo: number | null,
     randomSides?: boolean,
   ): Promise<ScheduleUpdateResult> {
-    // check the schedule does not exist already
-    const existingSchedule = await this.databaseService.schedule.findFirst({
-      where: {
-        tournaments_id: t,
-        usa_player_id: BigInt(usa),
-        ussr_player_id: BigInt(ussr),
-      }
-    });
-    if (existingSchedule) {
-      throw new Error('Schedule already exists');
-    } 
+
     const schedule = await this.databaseService.schedule.create({
       data: {
         tournaments_id: t,
