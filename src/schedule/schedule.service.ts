@@ -123,7 +123,7 @@ export class ScheduleService {
   async getTournamentIdsWithSchedulesForUser(userId: number): Promise<Set<number>> {
     const schedules = await this.databaseService.schedule.findMany({
       where: {
-        game_results_id: null ,
+        game_results_id: null,
         OR: [
           { usa_player_id: userId },
           { ussr_player_id: userId },
@@ -133,7 +133,22 @@ export class ScheduleService {
       distinct: ['tournaments_id'],
     });
 
-    return new Set(schedules.map(s => s.tournaments_id));
+    const tournamentIds = schedules.map(s => s.tournaments_id);
+
+    // Include parent tournaments for any child tournaments
+    const tournaments = await this.databaseService.tournaments.findMany({
+      where: { id: { in: tournamentIds } },
+      select: { id: true, parent_id: true },
+    });
+
+    const allIds = new Set<number>(tournamentIds);
+    for (const t of tournaments) {
+      if (t.parent_id) {
+        allIds.add(t.parent_id);
+      }
+    }
+
+    return allIds;
   }
 
   async filterTournamentsBySchedule(tournaments: TournamentDto[], userId: number) {
