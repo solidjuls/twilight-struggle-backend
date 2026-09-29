@@ -27,6 +27,8 @@ import {
   DeletePlayerDto,
   ScheduleListResponse,
   UploadCsvScheduleDto,
+  GetUpcomingSchedulesQueryDto,
+  UpcomingScheduleDto,
 } from './dto/schedule.dto';
 
 @Controller('schedule')
@@ -124,6 +126,25 @@ export class ScheduleController {
       };
     } catch (error) {
       console.error('[Schedule GET]', error);
+      throw new HttpException(
+        'Internal Server Error',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Get('upcoming')
+  async getUpcomingSchedules(
+    @Query() query: GetUpcomingSchedulesQueryDto,
+  ): Promise<UpcomingScheduleDto[]> {
+    try {
+      const { tournamentId, days, includePast = false } = query;
+      const tournamentIdNum = Number(tournamentId);
+      const daysNum = Number(days);
+
+      return await this.scheduleService.getUpcomingSchedules(tournamentIdNum, daysNum, includePast);
+    } catch (error) {
+      console.error('[Schedule GET upcoming]', error);
       throw new HttpException(
         'Internal Server Error',
         HttpStatus.INTERNAL_SERVER_ERROR,

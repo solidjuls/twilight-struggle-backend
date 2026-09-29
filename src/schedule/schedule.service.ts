@@ -654,4 +654,60 @@ export class ScheduleService {
     // });
     // console.log("deleted", deleted);
   }
+
+  async getUpcomingSchedules(tournamentId: number, days: number, includePast: boolean) {
+    const now = new Date();
+    const futureDate = new Date();
+    futureDate.setDate(now.getDate() + days);
+
+    const where: any = {
+      tournaments_id: tournamentId,
+      game_results_id: null,
+    };
+
+    if (includePast) {
+      // Include all schedules with due_date <= futureDate (past and future within range)
+      where.due_date = { lte: futureDate };
+    } else {
+      // Only future schedules within the range
+      where.due_date = { gte: now, lte: futureDate };
+    }
+
+    const schedules = await this.databaseService.schedule.findMany({
+      where,
+      select: {
+        id: true,
+        game_code: true,
+        due_date: true,
+        users_schedule_usa_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+        users_schedule_ussr_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { due_date: 'asc' },
+    });
+
+    return schedules.map(s => ({
+      idUsa: s.users_schedule_usa_player_idTousers?.id?.toString() || '',
+      idUssr: s.users_schedule_ussr_player_idTousers?.id?.toString() || '',
+      nameUsa: `${s.users_schedule_usa_player_idTousers?.first_name || ''} ${s.users_schedule_usa_player_idTousers?.last_name || ''}`.trim(),
+      nameUssr: `${s.users_schedule_ussr_player_idTousers?.first_name || ''} ${s.users_schedule_ussr_player_idTousers?.last_name || ''}`.trim(),
+      emailUsa: s.users_schedule_usa_player_idTousers?.email || '',
+      emailUssr: s.users_schedule_ussr_player_idTousers?.email || '',
+      gameCode: s.game_code,
+      dueDate: s.due_date.toISOString(),
+    }));
+  }
 }
