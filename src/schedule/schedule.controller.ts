@@ -222,14 +222,6 @@ export class ScheduleController {
         );
       }
 
-      const children = await this.tournamentsService.getChildTournaments([Number(t)]);
-      if (children.length > 0) {
-        throw new HttpException(
-          'This tournament has playoffs running. Add the schedule on the correct playoff tab',
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
       const updated = await this.scheduleService.addSchedulePlayers(
         usa,
         ussr,
@@ -260,14 +252,6 @@ export class ScheduleController {
         if (best_of !== undefined && best_of !== null && ![1, 3, 5, 7].includes(best_of)) {
           throw new HttpException(
             'best_of must be 1, 3, 5, 7, or null',
-            HttpStatus.BAD_REQUEST,
-          );
-        }
-
-        const children = await this.tournamentsService.getChildTournaments([Number(t)]);
-        if (children.length > 0) {
-          throw new HttpException(
-            'This tournament has playoffs running. Add the schedule on the correct playoff tab',
             HttpStatus.BAD_REQUEST,
           );
         }
