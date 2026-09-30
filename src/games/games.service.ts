@@ -571,6 +571,7 @@ export class GamesService {
           // Check if only metadata changed (no rating recalculation needed) - only for non-insert operations
           if (
             !isInsert &&
+            !insertHardcodedGames &&
             oldGameDate.usa_player_id.toString() === input.usaPlayerId &&
             oldGameDate.ussr_player_id.toString() === input.ussrPlayerId &&
             oldGameDate.game_winner === input.gameWinner &&
@@ -630,27 +631,6 @@ export class GamesService {
               },
             ],
           });
-
-          // For hardcoded games insert, add all new games to the affected list
-          if (insertHardcodedGames && newGameIds.length > 0) {
-            const hardcodedGamesData = [
-              { id: newGameIds[0], created_at: new Date('2026-08-30T10:00:00Z'), usa_player_id: BigInt(2886), ussr_player_id: BigInt(1739), game_winner: '1', game_code: 'G001', tournament_id: 318 },
-              { id: newGameIds[1], created_at: new Date('2026-09-09T10:00:00Z'), usa_player_id: BigInt(1739), ussr_player_id: BigInt(2886), game_winner: '1', game_code: 'G002', tournament_id: 318 },
-              { id: newGameIds[2], created_at: new Date('2026-09-11T10:00:00Z'), usa_player_id: BigInt(2886), ussr_player_id: BigInt(1739), game_winner: '2', game_code: 'G003', tournament_id: 318 },
-              { id: newGameIds[3], created_at: new Date('2026-09-13T10:00:00Z'), usa_player_id: BigInt(1739), ussr_player_id: BigInt(2886), game_winner: '2', game_code: 'G004', tournament_id: 318 },
-              { id: newGameIds[4], created_at: new Date('2026-09-15T10:00:00Z'), usa_player_id: BigInt(2886), ussr_player_id: BigInt(1739), game_winner: '1', game_code: 'G005', tournament_id: 318 },
-            ];
-
-            // Insert each hardcoded game at the correct position
-            for (const game of hardcodedGamesData) {
-              const insertIndex = allGamesAffected.findIndex(g => g.created_at > game.created_at);
-              if (insertIndex === -1) {
-                allGamesAffected.push(game);
-              } else {
-                allGamesAffected.splice(insertIndex, 0, game);
-              }
-            }
-          }
 
           // For single insert, add the new game to the affected list in the correct position
           if (isInsert && newGameId && !insertHardcodedGames) {
