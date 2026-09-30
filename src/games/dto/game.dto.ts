@@ -57,7 +57,7 @@ export interface SubmitGameDto {
 export interface RecreateGameDto {
   oldId: string;
   gameDate: string;
-  op: 'delete' | undefined;
+  op: 'delete' | 'insert' | undefined;
   gameWinner: GameWinner;
   gameCode: string;
   tournamentId: string;
