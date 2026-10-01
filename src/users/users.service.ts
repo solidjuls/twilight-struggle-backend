@@ -30,6 +30,22 @@ export function parseDiscordUserId(value?: string | null): bigint | null | undef
 export class UsersService {
   constructor(private readonly databaseService: DatabaseService) {}
 
+  async checkEmailVerified(userId: string): Promise<{ verified: boolean; banned: boolean }> {
+    const user = await this.databaseService.users.findFirst({
+      where: { id: BigInt(userId) },
+      select: { email_verified_at: true, banned: true },
+    });
+
+    if (!user) {
+      return { verified: false, banned: false };
+    }
+
+    return {
+      verified: !!user.email_verified_at,
+      banned: !!user.banned,
+    };
+  }
+
   async getPlayerIdsByCountry(countryId: string): Promise<string[]> {
     const users = await this.databaseService.users.findMany({
       select: { id: true },
@@ -291,6 +307,9 @@ export class UsersService {
         return { success: false, error: `User with email ${userData.email} already exists` };
       }
 
+      // Hash password
+      const hashedPassword = await hash(userData.password, 12);
+
       // Create new user
       await this.databaseService.users.create({
         data: {
@@ -298,6 +317,7 @@ export class UsersService {
           last_name: userData.last_name,
           playdek_name: userData.playdek_name,
           email: userData.email,
+          password: hashedPassword,
           phone_number: userData.phone_number,
           preferred_gaming_platform: userData.preferredGamingPlatform,
           preferred_game_duration: userData.preferredGameDuration,
@@ -317,22 +337,29 @@ export class UsersService {
     const discordUserId = parseDiscordUserId(userData.discord_user_id);
 
     try {
+      const updateData: any = {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        playdek_name: userData.playdek_name,
+        discord_user_id: discordUserId,
+        phone_number: userData.phone,
+        last_login_at: new Date(),
+        preferred_gaming_platform: userData.preferredGamingPlatform,
+        preferred_game_duration: userData.preferredGameDuration,
+        city_id: userData.city,
+        country_id: userData.country,
+      };
+
+      // Hash and include password if provided
+      if (userData.password) {
+        updateData.password = await hash(userData.password, 12);
+      }
+
       await this.databaseService.users.update({
         where: {
           email: userData.email,
         },
-        data: {
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          playdek_name: userData.playdek_name,
-          discord_user_id: discordUserId,
-          phone_number: userData.phone,
-          last_login_at: new Date(),
-          preferred_gaming_platform: userData.preferredGamingPlatform,
-          preferred_game_duration: userData.preferredGameDuration,
-          city_id: userData.city,
-          country_id: userData.country,
-        },
+        data: updateData,
       });
 
       return { success: true };

@@ -142,19 +142,12 @@ export class UsersController {
   }
 
   @Put()
+  @Public()
   async createUser(
     @Body() userData: CreateUserDto,
     @CurrentUser() user: JwtPayloadDto,
   ) {
     try {
-      // Check if user has admin privileges (role_id 1 = SUPERADMIN, 2 = ADMIN)
-      if (user.role !== 1 && user.role !== 2) {
-        throw new HttpException(
-          'Insufficient privileges to create users',
-          HttpStatus.FORBIDDEN,
-        );
-      }
-
       const result = await this.usersService.createUser(userData);
       
       if (!result.success) {

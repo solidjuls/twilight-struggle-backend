@@ -33,26 +33,17 @@ export class AuthService {
       );
     }
 
-    // Check if email is verified
-    if (!user.email_verified_at) {
-      throw new UnauthorizedException({
-        message: 'Email not verified',
-        code: 'EMAIL_NOT_VERIFIED',
-        error: 'Your email address has not been verified. Please check your email and verify your account before logging in.'
-      });
-    }
 
     // Check if user is banned (treat as unverified)
     if (user.banned) {
       throw new UnauthorizedException({
-        message: 'Email not verified',
-        code: 'EMAIL_NOT_VERIFIED',
-        error: 'Your email address has not been verified. Please check your email and verify your account before logging in.'
+        message: 'This user is banned. Please, contact us at its.junta@gmail.com',
+        code: 'USER_BANNED',
+        error: 'This user is banned. Please, contact us at its.junta@gmail.com'
       });
     }
 
     if (!user.password) {
-      console.log("password")
       throw new UnauthorizedException('The password is incorrect');
     }
 
