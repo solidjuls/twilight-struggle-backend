@@ -13,6 +13,8 @@ import {
 import { GamesService } from './games.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentUser } from '../auth/decorators/auth.decorators';
+import { JwtPayloadDto } from '../auth/dto/auth.dto';
 import {
   GetGamesQueryDto,
   GameListResponse,
@@ -266,34 +268,23 @@ export class GamesController {
   }
 
   @Post('submit')
-  async submitGame(@Body() submitGameRequest: SubmitGameRequestDto) {
+  async submitGame(@Body() submitGameRequest: SubmitGameRequestDto, @CurrentUser() user: JwtPayloadDto) {
     try {
+      // Check email verification
+      const emailStatus = await this.usersService.checkEmailVerified(user.id);
+      if (!emailStatus.verified || emailStatus.banned) {
+        throw new HttpException(
+          {
+            message: 'Email not verified',
+            code: 'EMAIL_NOT_VERIFIED',
+            error: 'Your email address is not verified. Please verify your email to submit game results.',
+          },
+          HttpStatus.FORBIDDEN,
+        );
+      }
+
       const data = submitGameRequest.data;
-      // const tournamentHardcoded = (["345", "346", "347", "348", "318"].includes(data.tournamentId))
-      // if (!tournamentHardcoded && submitGameRequest.data.scheduleId) {
-      //   // Validate schedule integrity before submission
-      //   const validateSchedule = await this.scheduleService.validateScheduleIntegrity({
-      //     usaPlayerId: Number(data.usaPlayerId),
-      //     id: Number(data.scheduleId),
-      //     ussrPlayerId: Number(data.ussrPlayerId),
-      //     gameCode: data.gameCode,
-      //     tournamentId: Number(data.tournamentId),
-      //   });
-
-      //   if (validateSchedule?.game_results_id) {
-      //     throw new HttpException(
-      //       `Schedule ${data.scheduleId} already submitted`,
-      //       HttpStatus.BAD_REQUEST,
-      //     );
-      //   }
-
-      //   if (!validateSchedule?.id) {
-      //     throw new HttpException(
-      //       'Schedule not found',
-      //       HttpStatus.BAD_REQUEST,
-      //     );
-      //   }
-      // }
+      
       const result = await this.gamesService.submitGame(submitGameRequest.data);
 
       if (result && submitGameRequest.data.scheduleId) {
@@ -310,7 +301,7 @@ export class GamesController {
     } catch (error) {
       console.error('[Games POST Submit]', error);
       throw new HttpException(
-        'Error submitting result',
+        error.message,
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

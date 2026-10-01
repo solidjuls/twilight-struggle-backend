@@ -58,6 +58,7 @@ export interface CreateUserDto {
   last_name: string;
   playdek_name: string;
   email: string;
+  password: string;
   phone_number?: string;
   preferredGamingPlatform?: string;
   preferredGameDuration?: string;
@@ -76,6 +77,7 @@ export interface UpdateUserDto {
   preferredGameDuration?: string;
   city?: number;
   country?: number;
+  password?: string;
 }
 
 export interface UpdatePasswordDto {

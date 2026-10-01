@@ -84,6 +84,19 @@ export class TournamentsController {
       const { id, status, userId } = body;
 
       if (id && (userId || user.id)) {
+        // Check email verification before registering
+        const emailStatus = await this.userService.checkEmailVerified(user.id.toString());
+        if (!emailStatus.verified || emailStatus.banned) {
+          throw new HttpException(
+            {
+              message: 'Email not verified',
+              code: 'EMAIL_NOT_VERIFIED',
+              error: 'Your email address is not verified. Please verify your email to join tournaments.',
+            },
+            HttpStatus.FORBIDDEN,
+          );
+        }
+
         // Register user for tournament - use provided userId or current user's id
         const targetUserId = userId || user.id.toString();
 
