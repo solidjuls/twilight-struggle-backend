@@ -38,7 +38,6 @@ export class ScheduleService {
         tournamentFilter,
         ...(userFilter ? [userFilter] : []),
       ],
-      game_results_id: null,
     };
 
     const selectFields = {
