@@ -113,6 +113,10 @@ export interface UpcomingScheduleDto {
   nameUssr: string;
   emailUsa: string;
   emailUssr: string;
+  playdekUsa: string;
+  playdekUssr: string;
+  timezoneUsa: string;
+  timezoneUssr: string;
   gameCode: string;
   dueDate: string;
 }

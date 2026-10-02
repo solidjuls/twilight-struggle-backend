@@ -1,6 +1,9 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
 import { EmailService, SMTPConfig } from './email.service';
 import { Public } from '../auth/decorators/auth.decorators';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtPayloadDto } from '../auth/dto/auth.dto';
+import { TournamentsService } from '../tournaments/tournaments.service';
 
 interface TestEmailDto {
   to: string;
@@ -23,9 +26,26 @@ interface SendEmailDto {
   smtpPassword: string;
 }
 
+interface ReminderDto {
+  gameCode: string;
+  daysLeft: number;
+  dueDate: string;
+  usaEmail: string;
+  ussrEmail: string;
+  usaPlayerFullName: string;
+  usaPlaydekName: string;
+  ussrPlayerFullName: string;
+  ussrPlaydekName: string;
+  usaTimezone: string;
+  ussrTimezone: string;
+}
+
 @Controller('email')
 export class EmailController {
-  constructor(private emailService: EmailService) {}
+  constructor(
+    private emailService: EmailService,
+    private tournamentsService: TournamentsService,
+  ) {}
 
   @Public()
   @Post('test')
@@ -75,11 +95,11 @@ export class EmailController {
         html: sendEmailDto.html,
         text: sendEmailDto.text,
       }, smtpConfig);
-      
+
       return {
         success,
-        message: success 
-          ? 'Email sent successfully!' 
+        message: success
+          ? 'Email sent successfully!'
           : 'Failed to send email. Please check your SMTP configuration.',
       };
     } catch (error) {
@@ -88,5 +108,68 @@ export class EmailController {
         message: 'Error sending email: ' + error.message,
       };
     }
+  }
+
+  @Post('reminders')
+  @HttpCode(HttpStatus.OK)
+  async sendReminders(@Body() reminders: ReminderDto[], @CurrentUser() user: JwtPayloadDto) {
+    const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+      user.role,
+      user.id,
+      359,
+    );
+
+    if (!isAdmin) {
+      throw new HttpException(
+        'You are not admin of this tournament',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const smtpConfig: SMTPConfig = {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER_JUNTA || '',
+      password: process.env.SMTP_PWD_JUNTA || '',
+    };
+
+    const results = [];
+
+    const reminder = reminders[0];
+    const destEmails = [reminder.usaEmail, reminder.ussrEmail].filter(Boolean);
+
+    try {
+      const success = await this.emailService.sendReminderEmail(
+        destEmails,
+        reminder.gameCode,
+        reminder.daysLeft,
+        reminder.dueDate,
+        reminder.usaPlayerFullName,
+        reminder.usaPlaydekName,
+        reminder.usaTimezone,
+        reminder.ussrPlayerFullName,
+        reminder.ussrPlaydekName,
+        reminder.ussrTimezone,
+        smtpConfig,
+      );
+
+      results.push({
+        gameCode: reminder.gameCode,
+        success,
+      });
+    } catch (error) {
+      results.push({
+        gameCode: reminder.gameCode,
+        success: false,
+        error: error.message,
+      });
+    }
+
+    return {
+      success: true,
+      total: reminders.length,
+      results,
+    };
   }
 }

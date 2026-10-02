@@ -699,6 +699,12 @@ export class ScheduleService {
             first_name: true,
             last_name: true,
             email: true,
+            playdek_name: true,
+            cities: {
+              select: {
+                timeZoneId: true,
+              },
+            },
           },
         },
         users_schedule_ussr_player_idTousers: {
@@ -707,6 +713,12 @@ export class ScheduleService {
             first_name: true,
             last_name: true,
             email: true,
+            playdek_name: true,
+            cities: {
+              select: {
+                timeZoneId: true,
+              },
+            },
           },
         },
       },
@@ -720,6 +732,10 @@ export class ScheduleService {
       nameUssr: `${s.users_schedule_ussr_player_idTousers?.first_name || ''} ${s.users_schedule_ussr_player_idTousers?.last_name || ''}`.trim(),
       emailUsa: s.users_schedule_usa_player_idTousers?.email || '',
       emailUssr: s.users_schedule_ussr_player_idTousers?.email || '',
+      playdekUsa: s.users_schedule_usa_player_idTousers?.playdek_name || '',
+      playdekUssr: s.users_schedule_ussr_player_idTousers?.playdek_name || '',
+      timezoneUsa: s.users_schedule_usa_player_idTousers?.cities?.timeZoneId || '',
+      timezoneUssr: s.users_schedule_ussr_player_idTousers?.cities?.timeZoneId || '',
       gameCode: s.game_code,
       dueDate: s.due_date.toISOString(),
     }));
