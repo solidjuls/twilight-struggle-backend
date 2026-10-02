@@ -127,11 +127,6 @@ Once the game is completed, please remember to report the result immediately her
 If you encounter any difficulties in contacting the other player, please report it by replying to this email. Otherwise, failure to submit the result on time may result in a penalty.
 </p>
 
-<p>
-Remember that you can find the complete schedule here:<br>
-<a href="https://twilight-struggle.com/schedule">https://twilight-struggle.com/schedule</a>
-</p>
-
 <p>Good luck to you both,</p>
 
 <p><strong>ITS Junta</strong></p>
