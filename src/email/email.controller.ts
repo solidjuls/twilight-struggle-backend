@@ -136,34 +136,35 @@ export class EmailController {
 
     const results = [];
 
-    const reminder = reminders[0];
-    const destEmails = [reminder.usaEmail, reminder.ussrEmail].filter(Boolean);
+    for (const reminder of reminders) {
+      const destEmails = [reminder.usaEmail, reminder.ussrEmail].filter(Boolean);
 
-    try {
-      const success = await this.emailService.sendReminderEmail(
-        destEmails,
-        reminder.gameCode,
-        reminder.daysLeft,
-        reminder.dueDate,
-        reminder.usaPlayerFullName,
-        reminder.usaPlaydekName,
-        reminder.usaTimezone,
-        reminder.ussrPlayerFullName,
-        reminder.ussrPlaydekName,
-        reminder.ussrTimezone,
-        smtpConfig,
-      );
+      try {
+        const success = await this.emailService.sendReminderEmail(
+          destEmails,
+          reminder.gameCode,
+          reminder.daysLeft,
+          reminder.dueDate,
+          reminder.usaPlayerFullName,
+          reminder.usaPlaydekName,
+          reminder.usaTimezone,
+          reminder.ussrPlayerFullName,
+          reminder.ussrPlaydekName,
+          reminder.ussrTimezone,
+          smtpConfig,
+        );
 
-      results.push({
-        gameCode: reminder.gameCode,
-        success,
-      });
-    } catch (error) {
-      results.push({
-        gameCode: reminder.gameCode,
-        success: false,
-        error: error.message,
-      });
+        results.push({
+          gameCode: reminder.gameCode,
+          success,
+        });
+      } catch (error) {
+        results.push({
+          gameCode: reminder.gameCode,
+          success: false,
+          error: error.message,
+        });
+      }
     }
 
     return {

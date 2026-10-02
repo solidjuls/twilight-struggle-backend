@@ -164,7 +164,7 @@ Remember that you can find the complete schedule here:<br>
       : `ITSL Season 16 - Game ${gameCode} ALERT`;
 
     const email: EmailOptions = {
-      to: ['juli.arnalot@gmail.com'],
+      to: destEmails,
       subject,
       text: '',
       html: this.reminderBodyEmail(
