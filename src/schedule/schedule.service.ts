@@ -671,8 +671,12 @@ export class ScheduleService {
 
   async getUpcomingSchedules(tournamentId: number, days: number, includePast: boolean) {
     const now = new Date();
-    const futureDate = new Date();
-    futureDate.setDate(now.getDate() + days);
+    const upperDate = new Date();
+    upperDate.setDate(now.getDate() + days);
+
+    const lowerDays = days <= 1 ? 0 : Math.floor(days / 2) + 1;
+    const lowerDate = new Date();
+    lowerDate.setDate(now.getDate() + lowerDays);
 
     const where: any = {
       tournaments_id: tournamentId,
@@ -680,11 +684,9 @@ export class ScheduleService {
     };
 
     if (includePast) {
-      // Include all schedules with due_date <= futureDate (past and future within range)
-      where.due_date = { lte: futureDate };
+      where.due_date = { lte: upperDate };
     } else {
-      // Only future schedules within the range
-      where.due_date = { gte: now, lte: futureDate };
+      where.due_date = { gte: lowerDate, lte: upperDate };
     }
 
     const schedules = await this.databaseService.schedule.findMany({
