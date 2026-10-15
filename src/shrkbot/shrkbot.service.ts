@@ -12,6 +12,12 @@ import {
 const DEFAULT_API_URL = 'https://shrkbot.com/api/twilight-struggle/v1';
 const REQUEST_TIMEOUT_MS = 5000;
 
+export class ShrkbotDisabledError extends Error {
+  constructor() {
+    super('SHRKBOT_API_KEY is not set, so nothing can be sent to shrkbot');
+  }
+}
+
 const PLAYER_SELECT = {
   first_name: true,
   last_name: true,
@@ -45,15 +51,19 @@ export class ShrkbotService implements OnModuleInit {
     }
 
     try {
-      const lineage = await this.tournamentLineage(tournamentId);
-
-      for (const tournament of lineage) {
-        await this.send('PUT', `tournaments/${tournament.id}`, {
-          tournament: buildTournamentPayload(tournament),
-        });
-      }
+      await this.pushTournamentLineage(tournamentId);
     } catch (error) {
       this.logger.error(`Failed to send tournament ${tournamentId} to shrkbot`, error);
+    }
+  }
+
+  async pushTournamentLineage(tournamentId: number): Promise<void> {
+    const lineage = await this.tournamentLineage(tournamentId);
+
+    for (const tournament of lineage) {
+      await this.send('PUT', `tournaments/${tournament.id}`, {
+        tournament: buildTournamentPayload(tournament),
+      });
     }
   }
 
@@ -74,22 +84,30 @@ export class ShrkbotService implements OnModuleInit {
       return;
     }
 
-    const id = BigInt(gameResultId);
-
     try {
-      const game = await this.findGame(id);
-      if (!game) {
-        return;
-      }
-
-      if (game.tournament_id !== null && game.tournament_id !== FRIENDLY_GAME_TOURNAMENT_ID) {
-        await this.syncTournament(game.tournament_id);
-      }
-
-      await this.send('PUT', `games/${id}`, { game: buildGamePayload(game) });
+      await this.pushGame(gameResultId);
     } catch (error) {
-      this.logger.error(`Failed to send game ${id} to shrkbot`, error);
+      this.logger.error(`Failed to send game ${BigInt(gameResultId)} to shrkbot`, error);
     }
+  }
+
+  async pushGame(gameResultId: bigint | number): Promise<void> {
+    if (!this.apiKey) {
+      throw new ShrkbotDisabledError();
+    }
+
+    const id = BigInt(gameResultId);
+    const game = await this.findGame(id);
+
+    if (!game) {
+      return;
+    }
+
+    if (game.tournament_id !== null && game.tournament_id !== FRIENDLY_GAME_TOURNAMENT_ID) {
+      await this.pushTournamentLineage(game.tournament_id);
+    }
+
+    await this.send('PUT', `games/${id}`, { game: buildGamePayload(game) });
   }
 
   async deleteGame(gameResultId: bigint | number): Promise<void> {

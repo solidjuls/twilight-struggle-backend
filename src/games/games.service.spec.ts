@@ -73,21 +73,30 @@ describe('GamesService sends every reported result to shrkbot', () => {
   let service: GamesService;
   let syncGame: jest.Mock;
   let deleteGame: jest.Mock;
+  let pushGame: jest.Mock;
 
   beforeEach(async () => {
     syncGame = jest.fn().mockResolvedValue(undefined);
     deleteGame = jest.fn().mockResolvedValue(undefined);
+    pushGame = jest.fn().mockResolvedValue(undefined);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GamesService,
         { provide: DatabaseService, useValue: databaseDouble() },
         { provide: RatingService, useValue: ratingDouble() },
-        { provide: ShrkbotService, useValue: { syncGame, deleteGame } },
+        { provide: ShrkbotService, useValue: { syncGame, deleteGame, pushGame } },
       ],
     }).compile();
 
     service = module.get<GamesService>(GamesService);
+  });
+
+  it('reports the failure when a game is sent again by hand', async () => {
+    pushGame.mockRejectedValue(new Error('shrkbot answered 422 to PUT games/1024'));
+
+    await expect(service.resyncGame(BigInt(GAME_ID))).rejects.toThrow('shrkbot answered 422');
+    expect(syncGame).not.toHaveBeenCalled();
   });
 
   it('sends a newly submitted game', async () => {
