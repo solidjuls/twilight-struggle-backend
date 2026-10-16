@@ -159,6 +159,12 @@ export class GamesService {
           select: {
             tournament_name: true,
             id: true,
+            parent_id: true,
+            parent: {
+              select: {
+                tournament_name: true,
+              },
+            },
           },
         },
         users_game_results_usa_player_idTousers: {
@@ -197,7 +203,7 @@ export class GamesService {
     const normalizedGames = games.map((game: any) => {
       let ratingHistoryUSA = 0;
       let ratingHistoryUSSR = 0;
-      
+
       game.ratings_history.forEach(({ rating, player_id }) => {
         if (player_id === game.usa_player_id) {
           ratingHistoryUSA = rating;
@@ -206,8 +212,17 @@ export class GamesService {
         }
       });
 
+      const tournamentName =
+        game.tournaments?.parent_id != null && game.tournaments?.parent
+          ? game.tournaments.parent.tournament_name + ' Playoffs'
+          : game.tournaments?.tournament_name;
+
       return {
         ...game,
+        tournaments: {
+          id: game.tournaments?.id,
+          tournament_name: tournamentName,
+        },
         ratingHistoryUSA,
         ratingHistoryUSSR,
       };
