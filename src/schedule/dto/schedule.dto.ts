@@ -105,3 +105,24 @@ export interface ScheduleListResponse {
   userTournaments?: any[];
   defaultTournament?: string;
 }
+
+export interface UpcomingScheduleDto {
+  idUsa: string;
+  idUssr: string;
+  nameUsa: string;
+  nameUssr: string;
+  emailUsa: string;
+  emailUssr: string;
+  playdekUsa: string;
+  playdekUssr: string;
+  timezoneUsa: string;
+  timezoneUssr: string;
+  gameCode: string;
+  dueDate: string;
+}
+
+export interface GetUpcomingSchedulesQueryDto {
+  tournamentId: string;
+  days: '1' | '5' | '15' | '30';
+  includePast?: boolean;
+}

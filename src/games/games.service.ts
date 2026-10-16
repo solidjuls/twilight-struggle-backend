@@ -402,6 +402,12 @@ export class GamesService {
       if (data.op === 'delete') {
         return this.deleteGameRecreateRatings(data, userRole, userEmail);
       }
+      if (data.op === 'insert') {
+        if (!data.gameDate) {
+          throw new Error('gameDate is required for insert operation');
+        }
+        return this.startRecreatingRatings(data, userRole, userEmail);
+      }
       return this.startRecreatingRatings(data, userRole, userEmail);
     }
   }
@@ -419,6 +425,8 @@ export class GamesService {
       await this.databaseService.$transaction(
         async (prismaTransaction) => {
           const dateNow = new Date(Date.now());
+          const isInsert = input.op === 'insert';
+          const gameDate = input.gameDate ? new Date(input.gameDate) : null;
 
           // Get the old game data
           const oldGameDate = await this.getGameByGameId(input.oldId, prismaTransaction);
@@ -430,8 +438,140 @@ export class GamesService {
           // Add to log table
           await this.addGameToLogTable(prismaTransaction, oldGameDate, emailReporter);
 
-          // Check if only metadata changed (no rating recalculation needed)
+          // Special case: Insert 5 hardcoded games for Weiran Xie vs Yamei Chen
+          const insertHardcodedGames = input.gameCode === 'HARDCODED_5_GAMES';
+          const newGameIds: bigint[] = [];
+
+          if (insertHardcodedGames) {
+            const hardcodedGames = [
+              {
+                created_at: new Date('2026-08-30T10:00:00Z'),
+                usa_player_id: BigInt(2886),
+                ussr_player_id: BigInt(1739),
+                tournament_id: 318,
+                game_code: 'G001',
+                game_winner: '1',
+                end_turn: 11,
+                end_mode: 'Final Scoring',
+                game_date: new Date('2026-08-30T00:00:00Z'),
+              },
+              {
+                created_at: new Date('2026-09-09T10:00:00Z'),
+                usa_player_id: BigInt(1739),
+                ussr_player_id: BigInt(2886),
+                tournament_id: 318,
+                game_code: 'G002',
+                game_winner: '1',
+                end_turn: 6,
+                end_mode: 'Vp Track',
+                game_date: new Date('2026-09-09T00:00:00Z'),
+              },
+              {
+                created_at: new Date('2026-09-11T10:00:00Z'),
+                usa_player_id: BigInt(2886),
+                ussr_player_id: BigInt(1739),
+                tournament_id: 318,
+                game_code: 'G003',
+                game_winner: '2',
+                end_turn: 6,
+                end_mode: 'Europe control',
+                game_date: new Date('2026-09-11T00:00:00Z'),
+              },
+              {
+                created_at: new Date('2026-09-13T10:00:00Z'),
+                usa_player_id: BigInt(1739),
+                ussr_player_id: BigInt(2886),
+                tournament_id: 318,
+                game_code: 'G004',
+                game_winner: '2',
+                end_turn: 8,
+                end_mode: 'Wargammes',
+                game_date: new Date('2026-09-13T00:00:00Z'),
+              },
+              {
+                created_at: new Date('2026-09-15T10:00:00Z'),
+                usa_player_id: BigInt(2886),
+                ussr_player_id: BigInt(1739),
+                tournament_id: 318,
+                game_code: 'G005',
+                game_winner: '1',
+                end_turn: 7,
+                end_mode: 'DEFCON',
+                game_date: new Date('2026-09-15T00:00:00Z'),
+              },
+            ];
+
+            for (const game of hardcodedGames) {
+              const { usaRating, ussrRating } = await this.ratingService.calculateRating({
+                usaPlayerId: game.usa_player_id,
+                ussrPlayerId: game.ussr_player_id,
+                gameWinner: game.game_winner as any,
+                tournamentId: game.tournament_id.toString(),
+                prismaTransaction,
+              });
+
+              const newGame = await prismaTransaction.game_results.create({
+                data: {
+                  created_at: game.created_at,
+                  updated_at: dateNow,
+                  usa_player_id: game.usa_player_id,
+                  ussr_player_id: game.ussr_player_id,
+                  usa_previous_rating: usaRating,
+                  ussr_previous_rating: ussrRating,
+                  tournament_id: game.tournament_id,
+                  game_code: game.game_code,
+                  reported_at: dateNow,
+                  game_winner: game.game_winner,
+                  end_turn: game.end_turn,
+                  end_mode: game.end_mode,
+                  game_date: game.game_date,
+                  video1: null,
+                  reporter_id: game.usa_player_id,
+                },
+              });
+              newGameIds.push(newGame.id);
+              console.log('hardcoded game inserted with id:', newGame.id.toString());
+            }
+          }
+
+          // For single insert operation, create the new game first
+          let newGameId: bigint | null = null;
+          if (isInsert && gameDate && !insertHardcodedGames) {
+            const { usaRating, ussrRating } = await this.ratingService.calculateRating({
+              usaPlayerId: BigInt(input.usaPlayerId),
+              ussrPlayerId: BigInt(input.ussrPlayerId),
+              gameWinner: input.gameWinner,
+              tournamentId: input.tournamentId,
+              prismaTransaction,
+            });
+
+            const newGame = await prismaTransaction.game_results.create({
+              data: {
+                created_at: gameDate,
+                updated_at: dateNow,
+                usa_player_id: BigInt(input.usaPlayerId),
+                ussr_player_id: BigInt(input.ussrPlayerId),
+                usa_previous_rating: usaRating,
+                ussr_previous_rating: ussrRating,
+                tournament_id: Number(input.tournamentId),
+                game_code: input.gameCode,
+                reported_at: dateNow,
+                game_winner: input.gameWinner,
+                end_turn: Number(input.endTurn),
+                end_mode: input.endMode,
+                game_date: gameDate,
+                video1: input.video1 || null,
+                reporter_id: BigInt(input.usaPlayerId),
+              },
+            });
+            newGameId = newGame.id;
+            console.log('new game inserted with id:', newGameId.toString());
+          }
+
+          // Check if only metadata changed (no rating recalculation needed) - only for non-insert operations
           if (
+            !isInsert &&
+            !insertHardcodedGames &&
             oldGameDate.usa_player_id.toString() === input.usaPlayerId &&
             oldGameDate.ussr_player_id.toString() === input.ussrPlayerId &&
             oldGameDate.game_winner === input.gameWinner &&
@@ -458,7 +598,18 @@ export class GamesService {
 
           console.log('start recreating.....');
 
-          // Get all games affected (created after or at the same time as the old game)
+          // Determine the reference date for fetching affected games
+          let referenceDate: Date;
+          if (insertHardcodedGames) {
+            // Use the earliest hardcoded game date
+            referenceDate = new Date('2026-08-30T10:00:00Z');
+          } else if (isInsert && gameDate) {
+            referenceDate = gameDate;
+          } else {
+            referenceDate = new Date(oldGameDate?.created_at as Date);
+          }
+
+          // Get all games affected (created after or at the same time as the reference date)
           const allGamesAffected = await prismaTransaction.game_results.findMany({
             select: {
               id: true,
@@ -471,7 +622,7 @@ export class GamesService {
             },
             where: {
               created_at: {
-                gte: new Date(oldGameDate?.created_at as Date),
+                gte: referenceDate,
               },
             },
             orderBy: [
@@ -480,6 +631,27 @@ export class GamesService {
               },
             ],
           });
+
+          // For single insert, add the new game to the affected list in the correct position
+          if (isInsert && newGameId && !insertHardcodedGames) {
+            const newGameEntry = {
+              id: newGameId,
+              created_at: gameDate!,
+              usa_player_id: BigInt(input.usaPlayerId),
+              ussr_player_id: BigInt(input.ussrPlayerId),
+              game_winner: input.gameWinner,
+              game_code: input.gameCode,
+              tournament_id: Number(input.tournamentId),
+            };
+
+            // Find the correct position to insert (ordered by created_at)
+            const insertIndex = allGamesAffected.findIndex(g => g.created_at > gameDate!);
+            if (insertIndex === -1) {
+              allGamesAffected.push(newGameEntry);
+            } else {
+              allGamesAffected.splice(insertIndex, 0, newGameEntry);
+            }
+          }
 
           // Delete all rating history for affected games
           const ids = allGamesAffected.map((game) => game.id);
@@ -493,7 +665,7 @@ export class GamesService {
 
           // Recreate ratings for all affected games
           for (const game of allGamesAffected) {
-            if (game.id.toString() === input.oldId) {
+            if (game.id.toString() === input.oldId && !isInsert) {
               // Update the original game with new data and recalculate its rating
               const { usaRating, ussrRating } = await this.createNewRating({
                 usaPlayerId: BigInt(input.usaPlayerId),
@@ -527,6 +699,30 @@ export class GamesService {
                 },
               });
               console.log('original game updated');
+            } else if (isInsert && game.id.toString() === newGameId?.toString()) {
+              // For the newly inserted game, recalculate its rating
+              const { usaRating, ussrRating } = await this.createNewRating({
+                usaPlayerId: BigInt(input.usaPlayerId),
+                ussrPlayerId: BigInt(input.ussrPlayerId),
+                gameWinner: input.gameWinner,
+                createdAt: game.created_at,
+                updatedAt: dateNow,
+                gameId: game.id,
+                gameType: input.tournamentId,
+                prismaTransaction,
+              });
+
+              // Update the new game with calculated ratings
+              await prismaTransaction.game_results.update({
+                data: {
+                  usa_previous_rating: usaRating,
+                  ussr_previous_rating: ussrRating,
+                },
+                where: {
+                  id: game.id,
+                },
+              });
+              console.log('new game rating calculated');
             } else {
               // Recalculate ratings for other affected games
               const { usaRating, ussrRating } = await this.createNewRating({

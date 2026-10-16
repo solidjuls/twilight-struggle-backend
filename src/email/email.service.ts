@@ -70,17 +70,6 @@ Remember that you can find the complete schedule here:<br>
 <p><strong>ITS Junta</strong></p>
 `
 
-  async sendPlayoffsEmailAdminNotification(destEmails: string[], winnerId: bigint | null, smtpConfig: SMTPConfig) {
-    const email: EmailOptions = {
-      subject: 'ITSL - Playoffs update',
-      text: "",
-      html: this.playoffsBodyEmailAdminNotification(winnerId),
-      to: destEmails
-    }
-
-    this.sendEmail(email, smtpConfig)
-  }
-
   async sendPlayoffsEmail(destEmails: string[], tournamentName: string, dueDate: string, usaPlayer: string, ussrPlayerTwo: string ,smtpConfig: SMTPConfig) {
     const email: EmailOptions = {
       subject: tournamentName,
@@ -90,6 +79,103 @@ Remember that you can find the complete schedule here:<br>
     }
 
     this.sendEmail(email, smtpConfig)
+  }
+
+  private readonly reminderBodyEmail = (
+    gameCode: string,
+    daysLeftText: string,
+    dueDate: string,
+    usaPlayerFullName: string,
+    usaPlaydek: string,
+    usaTimezone: string,
+    ussrPlayerFullName: string,
+    ussrPlaydek: string,
+    ussrTimezone: string,
+  ) => `
+<p>Dear players,</p>
+
+<p>Just a friendly reminder that the due date for your Game ${gameCode} ${daysLeftText}</p>
+
+<p>Below is the information for your game:</p>
+
+<p>
+Due Date: ${dueDate}<br>
+US Player: ${usaPlayerFullName} (Playdek: ${usaPlaydek}) - Timezone: ${usaTimezone}<br>
+USSR Player: ${ussrPlayerFullName} (Playdek: ${ussrPlaydek}) - Timezone: ${ussrTimezone}
+</p>
+
+<p>(Both players are copied in this email, so you can simply reply all and remove my address for scheduling.)</p>
+
+<p>
+Recommended duration: 60 minutes<br>
+<em>*This duration is calculated based on your preferences in the form, but you can agree on a different duration. If no agreement is reached, the default duration will be 60 minutes.</em>
+</p>
+
+<p>Game code: ${gameCode}</p>
+
+<p>
+To help you schedule your game, you can use this convenient timezone converter:<br>
+<a href="https://time.is/compare/2000_15_April_2025_in_Paris/Paris">https://time.is/compare/2000_15_April_2025_in_Paris/Paris</a>
+</p>
+
+<p>
+Once the game is completed, please remember to report the result immediately here:<br>
+<a href="https://twilight-struggle.com/schedule">https://twilight-struggle.com/schedule</a>
+</p>
+
+<p>
+If you encounter any difficulties in contacting the other player, please report it by replying to this email. Otherwise, failure to submit the result on time may result in a penalty.
+</p>
+
+<p>Good luck to you both,</p>
+
+<p><strong>ITS Junta</strong></p>
+`
+
+  async sendReminderEmail(
+    destEmails: string[],
+    gameCode: string,
+    daysLeft: number,
+    dueDate: string,
+    usaPlayerFullName: string,
+    usaPlaydek: string,
+    usaTimezone: string,
+    ussrPlayerFullName: string,
+    ussrPlaydek: string,
+    ussrTimezone: string,
+    smtpConfig: SMTPConfig,
+  ) {
+    const daysLeftText = daysLeft < 0
+      ? `is due ${Math.abs(daysLeft)} days`
+      : daysLeft <= 1
+        ? 'is due tomorrow'
+        : daysLeft <= 5
+          ? 'is in less than 5 days'
+          : daysLeft <= 15
+            ? 'is in less than 15 days'
+            : 'is in less than 30 days';
+    const subject = daysLeft <= 0
+      ? `ITSL Season 16 – Game ${gameCode} is due`
+      : `ITSL Season 16 - Game ${gameCode} ALERT`;
+
+    const email: EmailOptions = {
+      to: destEmails,
+      subject,
+      text: '',
+      html: this.reminderBodyEmail(
+        gameCode,
+        daysLeftText,
+        dueDate.slice(0, 10),
+        usaPlayerFullName,
+        usaPlaydek,
+        usaTimezone,
+        ussrPlayerFullName,
+        ussrPlaydek,
+        ussrTimezone,
+      ),
+    };
+
+    return this.sendEmail(email, smtpConfig);
   }
 
   /**

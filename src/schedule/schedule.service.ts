@@ -38,7 +38,6 @@ export class ScheduleService {
         tournamentFilter,
         ...(userFilter ? [userFilter] : []),
       ],
-      game_results_id: null,
     };
 
     const selectFields = {
@@ -123,7 +122,7 @@ export class ScheduleService {
   async getTournamentIdsWithSchedulesForUser(userId: number): Promise<Set<number>> {
     const schedules = await this.databaseService.schedule.findMany({
       where: {
-        game_results_id: null ,
+        game_results_id: null,
         OR: [
           { usa_player_id: userId },
           { ussr_player_id: userId },
@@ -133,7 +132,22 @@ export class ScheduleService {
       distinct: ['tournaments_id'],
     });
 
-    return new Set(schedules.map(s => s.tournaments_id));
+    const tournamentIds = schedules.map(s => s.tournaments_id);
+
+    // Include parent tournaments for any child tournaments
+    const tournaments = await this.databaseService.tournaments.findMany({
+      where: { id: { in: tournamentIds } },
+      select: { id: true, parent_id: true },
+    });
+
+    const allIds = new Set<number>(tournamentIds);
+    for (const t of tournaments) {
+      if (t.parent_id) {
+        allIds.add(t.parent_id);
+      }
+    }
+
+    return allIds;
   }
 
   async filterTournamentsBySchedule(tournaments: TournamentDto[], userId: number) {
@@ -653,5 +667,79 @@ export class ScheduleService {
     //   },
     // });
     // console.log("deleted", deleted);
+  }
+
+  async getUpcomingSchedules(tournamentId: number, days: number, includePast: boolean) {
+    const now = new Date();
+    const upperDate = new Date();
+    upperDate.setDate(now.getDate() + days);
+
+    const lowerDays = days <= 1 ? 0 : Math.floor(days / 2) + 1;
+    const lowerDate = new Date();
+    lowerDate.setDate(now.getDate() + lowerDays);
+
+    const where: any = {
+      tournaments_id: tournamentId,
+      game_results_id: null,
+    };
+
+    if (includePast) {
+      where.due_date = { lte: upperDate };
+    } else {
+      where.due_date = { gte: lowerDate, lte: upperDate };
+    }
+
+    const schedules = await this.databaseService.schedule.findMany({
+      where,
+      select: {
+        id: true,
+        game_code: true,
+        due_date: true,
+        users_schedule_usa_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            playdek_name: true,
+            cities: {
+              select: {
+                timeZoneId: true,
+              },
+            },
+          },
+        },
+        users_schedule_ussr_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+            playdek_name: true,
+            cities: {
+              select: {
+                timeZoneId: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { due_date: 'asc' },
+    });
+
+    return schedules.map(s => ({
+      idUsa: s.users_schedule_usa_player_idTousers?.id?.toString() || '',
+      idUssr: s.users_schedule_ussr_player_idTousers?.id?.toString() || '',
+      nameUsa: `${s.users_schedule_usa_player_idTousers?.first_name || ''} ${s.users_schedule_usa_player_idTousers?.last_name || ''}`.trim(),
+      nameUssr: `${s.users_schedule_ussr_player_idTousers?.first_name || ''} ${s.users_schedule_ussr_player_idTousers?.last_name || ''}`.trim(),
+      emailUsa: s.users_schedule_usa_player_idTousers?.email || '',
+      emailUssr: s.users_schedule_ussr_player_idTousers?.email || '',
+      playdekUsa: s.users_schedule_usa_player_idTousers?.playdek_name || '',
+      playdekUssr: s.users_schedule_ussr_player_idTousers?.playdek_name || '',
+      timezoneUsa: s.users_schedule_usa_player_idTousers?.cities?.timeZoneId || '',
+      timezoneUssr: s.users_schedule_ussr_player_idTousers?.cities?.timeZoneId || '',
+      gameCode: s.game_code,
+      dueDate: s.due_date.toISOString(),
+    }));
   }
 }
