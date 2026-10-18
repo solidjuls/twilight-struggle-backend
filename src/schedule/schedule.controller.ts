@@ -117,6 +117,7 @@ export class ScheduleController {
         tournamentIds,
         userId: filterUserId,
         missingGames,
+        fullSchedule,
         page: parsedPage,
         pageSize: parsedPageSize,
       });
