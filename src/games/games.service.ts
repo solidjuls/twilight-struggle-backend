@@ -443,77 +443,36 @@ export class GamesService {
           const isInsert = input.op === 'insert';
           const gameDate = input.gameDate ? new Date(input.gameDate) : null;
 
-          // Get the old game data
-          const oldGameDate = await this.getGameByGameId(input.oldId, prismaTransaction);
-
-          if (!oldGameDate) {
-            throw new Error('Old game id is wrong');
-          }
-
-          // Add to log table
-          await this.addGameToLogTable(prismaTransaction, oldGameDate, emailReporter);
-
           // Special case: Insert 5 hardcoded games for Weiran Xie vs Yamei Chen
           const insertHardcodedGames = input.gameCode === 'HARDCODED_5_GAMES';
           const newGameIds: bigint[] = [];
 
+          // Get the old game data (not needed for hardcoded games insert)
+          let oldGameDate = null;
+          if (!insertHardcodedGames) {
+            oldGameDate = await this.getGameByGameId(input.oldId, prismaTransaction);
+
+            if (!oldGameDate) {
+              throw new Error('Old game id is wrong');
+            }
+
+            // Add to log table
+            await this.addGameToLogTable(prismaTransaction, oldGameDate, emailReporter);
+          }
+
           if (insertHardcodedGames) {
             const hardcodedGames = [
               {
-                created_at: new Date('2026-08-30T10:00:00Z'),
+                created_at: new Date('2026-10-08T22:00:00Z'),
                 usa_player_id: BigInt(2886),
-                ussr_player_id: BigInt(1739),
-                tournament_id: 318,
-                game_code: 'G001',
-                game_winner: '1',
+                ussr_player_id: BigInt(2084),
+                tournament_id: 359,
+                game_code: 'H201',
+                game_winner: '2',
                 end_turn: 11,
                 end_mode: 'Final Scoring',
-                game_date: new Date('2026-08-30T00:00:00Z'),
-              },
-              {
-                created_at: new Date('2026-09-09T10:00:00Z'),
-                usa_player_id: BigInt(1739),
-                ussr_player_id: BigInt(2886),
-                tournament_id: 318,
-                game_code: 'G002',
-                game_winner: '1',
-                end_turn: 6,
-                end_mode: 'Vp Track',
-                game_date: new Date('2026-09-09T00:00:00Z'),
-              },
-              {
-                created_at: new Date('2026-09-11T10:00:00Z'),
-                usa_player_id: BigInt(2886),
-                ussr_player_id: BigInt(1739),
-                tournament_id: 318,
-                game_code: 'G003',
-                game_winner: '2',
-                end_turn: 6,
-                end_mode: 'Europe control',
-                game_date: new Date('2026-09-11T00:00:00Z'),
-              },
-              {
-                created_at: new Date('2026-09-13T10:00:00Z'),
-                usa_player_id: BigInt(1739),
-                ussr_player_id: BigInt(2886),
-                tournament_id: 318,
-                game_code: 'G004',
-                game_winner: '2',
-                end_turn: 8,
-                end_mode: 'Wargammes',
-                game_date: new Date('2026-09-13T00:00:00Z'),
-              },
-              {
-                created_at: new Date('2026-09-15T10:00:00Z'),
-                usa_player_id: BigInt(2886),
-                ussr_player_id: BigInt(1739),
-                tournament_id: 318,
-                game_code: 'G005',
-                game_winner: '1',
-                end_turn: 7,
-                end_mode: 'DEFCON',
-                game_date: new Date('2026-09-15T00:00:00Z'),
-              },
+                game_date: new Date('2026-10-08T22:00:00Z'),
+              }
             ];
 
             for (const game of hardcodedGames) {
