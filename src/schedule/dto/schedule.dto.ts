@@ -21,6 +21,7 @@ export interface GetSchedulesQueryDto {
   tournamentId?: string;
   userId?: string; // view another user's schedule
   fullSchedule?: boolean; // view full tournament schedule
+  missingGames?: boolean; // admin: return all unplayed games (game_results_id is null)
   page?: string;
   pageSize?: string;
 }

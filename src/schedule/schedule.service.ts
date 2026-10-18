@@ -17,11 +17,13 @@ export class ScheduleService {
   async getSchedules({
     tournamentIds,
     userId,
+    missingGames,
     page,
     pageSize,
   }: {
     tournamentIds: string[];
     userId?: number;
+    missingGames?: boolean;
     page: number;
     pageSize: number;
   }): Promise<ScheduleListResponse> {
@@ -32,11 +34,13 @@ export class ScheduleService {
     const userFilter = userId
       ? { OR: [{ usa_player_id: userId }, { ussr_player_id: userId }] }
       : undefined;
+    const missingGamesFilter = missingGames ? { game_results_id: null } : undefined;
 
     const baseWhere = {
       AND: [
         tournamentFilter,
         ...(userFilter ? [userFilter] : []),
+        ...(missingGamesFilter ? [missingGamesFilter] : []),
       ],
     };
 
