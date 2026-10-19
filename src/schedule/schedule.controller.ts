@@ -80,6 +80,7 @@ export class ScheduleController {
         tournamentId,
         userId,
         fullSchedule = false,
+        missingGames = false,
         page = '1',
         pageSize = '20',
       } = query;
@@ -115,6 +116,8 @@ export class ScheduleController {
       const result = await this.scheduleService.getSchedules({
         tournamentIds,
         userId: filterUserId,
+        missingGames,
+        fullSchedule,
         page: parsedPage,
         pageSize: parsedPageSize,
       });

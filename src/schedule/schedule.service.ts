@@ -17,11 +17,15 @@ export class ScheduleService {
   async getSchedules({
     tournamentIds,
     userId,
+    missingGames,
+    fullSchedule,
     page,
     pageSize,
   }: {
     tournamentIds: string[];
     userId?: number;
+    missingGames?: boolean;
+    fullSchedule?: boolean;
     page: number;
     pageSize: number;
   }): Promise<ScheduleListResponse> {
@@ -32,11 +36,13 @@ export class ScheduleService {
     const userFilter = userId
       ? { OR: [{ usa_player_id: userId }, { ussr_player_id: userId }] }
       : undefined;
+    const missingGamesFilter = missingGames ? { game_results_id: null } : undefined;
 
     const baseWhere = {
       AND: [
         tournamentFilter,
         ...(userFilter ? [userFilter] : []),
+        ...(missingGamesFilter ? [missingGamesFilter] : []),
       ],
     };
 
@@ -81,13 +87,47 @@ export class ScheduleService {
     const totalCount = await this.databaseService.schedule.count({ where: baseWhere });
     const totalPages = Math.ceil(totalCount / pageSize);
 
-    // Fetch paginated results
-    const schedules = await this.databaseService.schedule.findMany({
-      select: selectFields,
-      where: baseWhere,
-      skip,
-      take: pageSize,
-    });
+    let schedules: any[];
+
+    if (fullSchedule) {
+      // Fetch all results for backend sorting
+      const allSchedules = await this.databaseService.schedule.findMany({
+        select: selectFields,
+        where: baseWhere,
+      });
+
+      // Sort: unplayed (game_results_id null) by due_date first, then played by game_date
+      schedules = allSchedules.sort((a, b) => {
+        const aUnplayed = a.game_results_id === null;
+        const bUnplayed = b.game_results_id === null;
+
+        // Unplayed games come first
+        if (aUnplayed && !bUnplayed) return -1;
+        if (!aUnplayed && bUnplayed) return 1;
+
+        // Both unplayed: sort by due_date
+        if (aUnplayed && bUnplayed) {
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        }
+
+        // Both played: sort by game_date
+        const aGameDate = a.game_results?.game_date ? new Date(a.game_results.game_date).getTime() : 0;
+        const bGameDate = b.game_results?.game_date ? new Date(b.game_results.game_date).getTime() : 0;
+        return aGameDate - bGameDate;
+      });
+
+      // Apply pagination after sorting
+      schedules = schedules.slice(skip, skip + pageSize);
+    } else {
+      // Fetch paginated results (no backend sorting)
+      schedules = await this.databaseService.schedule.findMany({
+        select: selectFields,
+        where: baseWhere,
+        skip,
+        take: pageSize,
+      });
+    }
+
     const results: ScheduleDto[] = schedules.map(this.mapScheduleResult);
 
     return {

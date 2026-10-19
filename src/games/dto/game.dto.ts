@@ -11,8 +11,6 @@ export interface GetGameChartQueryDto {
 
 export interface GameDto {
   id: string;
-  created_at: Date | null;
-  updated_at: Date | null;
   usaPlayerId: string;
   ussrPlayerId: string;
   usaRatingDifference: number;
@@ -55,9 +53,10 @@ export interface SubmitGameDto {
 }
 
 export interface RecreateGameDto {
-  oldId: string;
-  gameDate: string;
-  op: 'delete' | 'insert' | undefined;
+  oldId?: string;
+  gameDate?: string;
+  insert?: boolean;
+  op?: 'delete';
   gameWinner: GameWinner;
   gameCode: string;
   tournamentId: string;
