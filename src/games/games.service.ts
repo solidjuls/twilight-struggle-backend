@@ -92,8 +92,6 @@ export class GamesService {
 
         return {
           id: game.id.toString(),
-          created_at: game.created_at,
-          updated_at: game.updated_at,
           usaPlayerId: game.usa_player_id.toString(),
           ussrPlayerId: game.ussr_player_id.toString(),
           usaRatingDifference,
@@ -101,7 +99,7 @@ export class GamesService {
           tournamentName: game.tournaments?.tournament_name || 'Unknown',
           tournamentId: game.tournaments?.id.toString() || '',
           game_code: game.game_code,
-          reported_at: game.created_at,
+          reported_at: game.game_date,
           gameWinner: game.game_winner,
           endTurn: game.end_turn ? Number(game.end_turn) : null,
           endMode: game.end_mode,
@@ -139,7 +137,6 @@ export class GamesService {
         id: true,
         usa_player_id: true,
         ussr_player_id: true,
-        created_at: true,
         end_mode: true,
         end_turn: true,
         game_code: true,
@@ -195,7 +192,7 @@ export class GamesService {
       take: pageSize,
       orderBy: [
         {
-          created_at: 'desc',
+          game_date: 'desc',
         },
       ],
     });

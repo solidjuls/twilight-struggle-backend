@@ -11,8 +11,6 @@ export interface GetGameChartQueryDto {
 
 export interface GameDto {
   id: string;
-  created_at: Date | null;
-  updated_at: Date | null;
   usaPlayerId: string;
   ussrPlayerId: string;
   usaRatingDifference: number;
