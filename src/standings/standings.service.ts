@@ -71,7 +71,7 @@ export class StandingsService {
       console.log(`[Playoff] H2H tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA}, sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
       return bBeatsA - aBeatsB;
     }
-    console.log(`[Playoff] SoS tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA} (tied), sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
+    // console.log(`[Playoff] SoS tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA} (tied), sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
     return b.sos - a.sos;
   }
 
