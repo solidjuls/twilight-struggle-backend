@@ -48,30 +48,103 @@ export class StandingsService {
     if (b.winRate !== a.winRate) {
       return b.winRate - a.winRate;
     }
-    // Tiebreaker: H2H → winRate → sos
+    // Tiebreaker: H2H → sos (only for first position)
     const aBeatsB = h2h[a.userId]?.[b.userId] || 0;
     const bBeatsA = h2h[b.userId]?.[a.userId] || 0;
     if (aBeatsB !== bBeatsA) {
-      console.log(`[Standings] H2H tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA}, sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
       return bBeatsA - aBeatsB;
     }
     // winRate already equal, so next is sos
-    console.log(`[Standings] SoS tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA} (tied), sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
     return b.sos - a.sos;
   }
 
-  private comparePlayersPlayoff(a: StandingPlayer, b: StandingPlayer, h2h: H2HMap): number {
-    // Playoff order: winRate → H2H → sos
+  private comparePlayersNoH2H(a: StandingPlayer, b: StandingPlayer): number {
+    // winRate → sos (no H2H)
     if (b.winRate !== a.winRate) {
       return b.winRate - a.winRate;
     }
+    return b.sos - a.sos;
+  }
+
+  private allPlayersPlayedEachOther(playerIds: string[], h2h: H2HMap): boolean {
+    // Check if all players have played against each other
+    for (let i = 0; i < playerIds.length; i++) {
+      for (let j = i + 1; j < playerIds.length; j++) {
+        const aId = playerIds[i];
+        const bId = playerIds[j];
+        const aBeatsB = h2h[aId]?.[bId] || 0;
+        const bBeatsA = h2h[bId]?.[aId] || 0;
+        // If no games between them, they haven't played each other
+        if (aBeatsB === 0 && bBeatsA === 0) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  private sortPlayoffGroup(players: StandingPlayer[], h2h: H2HMap): void {
+    if (players.length <= 1) return;
+
+    // Group players by winRate
+    const winRateGroups: Record<number, StandingPlayer[]> = {};
+    for (const p of players) {
+      const wr = p.winRate;
+      if (!winRateGroups[wr]) winRateGroups[wr] = [];
+      winRateGroups[wr].push(p);
+    }
+
+    // Sort each winRate group
+    const sortedPlayers: StandingPlayer[] = [];
+    const winRates = Object.keys(winRateGroups).map(Number).sort((a, b) => b - a); // descending
+
+    for (const wr of winRates) {
+      const group = winRateGroups[wr];
+      
+      if (group.length === 1) {
+        sortedPlayers.push(group[0]);
+      } else {
+        // Check if all players in this group have played each other
+        const playerIds = group.map(p => p.userId);
+        const allPlayed = this.allPlayersPlayedEachOther(playerIds, h2h);
+        
+        if (allPlayed) {
+          // Use H2H as tiebreaker
+          const cmpWithH2H = (a: StandingPlayer, b: StandingPlayer) =>
+            this.comparePlayersPlayoff(a, b, h2h, playerIds);
+          group.sort(cmpWithH2H);
+        } else {
+          // Skip H2H, use winRate → sos only
+          const cmpNoH2H = (a: StandingPlayer, b: StandingPlayer) =>
+            this.comparePlayersNoH2H(a, b);
+          group.sort(cmpNoH2H);
+        }
+        
+        sortedPlayers.push(...group);
+      }
+    }
+
+    // Update the original array with sorted players
+    players.splice(0, players.length, ...sortedPlayers);
+  }
+
+  private comparePlayersPlayoff(a: StandingPlayer, b: StandingPlayer, h2h: H2HMap, tiedPlayerIds?: string[]): number {
+    // Playoff order: winRate → H2H (if all tied played each other) → sos
+    if (b.winRate !== a.winRate) {
+      return b.winRate - a.winRate;
+    }
+    
+    // Only apply H2H if all tied players have played against each other
+    if (tiedPlayerIds && tiedPlayerIds.length > 2 && !this.allPlayersPlayedEachOther(tiedPlayerIds, h2h)) {
+      // Skip H2H, go directly to sos
+      return b.sos - a.sos;
+    }
+    
     const aBeatsB = h2h[a.userId]?.[b.userId] || 0;
     const bBeatsA = h2h[b.userId]?.[a.userId] || 0;
     if (aBeatsB !== bBeatsA) {
-      console.log(`[Playoff] H2H tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA}, sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
       return bBeatsA - aBeatsB;
     }
-    // console.log(`[Playoff] SoS tiebreaker: ${a.name} vs ${b.name} — H2H: ${aBeatsB}-${bBeatsA} (tied), sos: ${a.sos.toFixed(4)}-${b.sos.toFixed(4)}`);
     return b.sos - a.sos;
   }
 
@@ -104,6 +177,23 @@ export class StandingsService {
         secondary_name: true,
       },
     });
+
+    // Fetch forfeited players for this tournament
+    const forfeitedRegistrations = await prisma.tournament_registration.findMany({
+      where: {
+        tournamentId: Number(tournamentId),
+        status: 'forfeited',
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    const forfeitedPlayerIds = new Set(
+      forfeitedRegistrations
+        .filter(r => r.userId !== null)
+        .map(r => r.userId!.toString())
+    );
 
     const players: StandingPlayersType = {};
 
@@ -221,9 +311,41 @@ export class StandingsService {
       players[id].sos = opponents.reduce((acc, opp) => acc + players[opp].winRate, 0) / opponents.length;
     });
 
+    // Debug SoS calculations for specific players
+    const debugPlayerIds = ['1815', '2429'];
+    for (const playerId of debugPlayerIds) {
+      if (players[playerId]) {
+        const p = players[playerId];
+        console.log(`\n========== SoS DEBUG for Player ${playerId} (${p.name}) ==========`);
+        console.log(`Games: W=${p.gamesWon} L=${p.gamesLost} T=${p.gamesTied}`);
+        console.log(`Win Rate: ${p.winRate} (${p.winRate * 100}%)`);
+        console.log(`Opponents (${p.opponents.length} total):`);
+        
+        let sum = 0;
+        p.opponents.forEach((oppId, idx) => {
+          const opp = players[oppId];
+          if (opp) {
+            const oppTotal = opp.gamesWon + opp.gamesLost + opp.gamesTied;
+            console.log(`  ${idx + 1}. Opponent ${oppId} (${opp.name})`);
+            console.log(`     Games: W=${opp.gamesWon} L=${opp.gamesLost} T=${opp.gamesTied} (total=${oppTotal})`);
+            console.log(`     Win Rate: ${opp.winRate} (${opp.winRate * 100}%)`);
+            console.log(`     Running sum: ${sum} + ${opp.winRate} = ${sum + opp.winRate}`);
+            sum += opp.winRate;
+          }
+        });
+        
+        console.log(`\nFinal SoS Calculation:`);
+        console.log(`  Sum of opponent win rates: ${sum}`);
+        console.log(`  Number of opponents: ${p.opponents.length}`);
+        console.log(`  SoS = ${sum} / ${p.opponents.length} = ${p.sos}`);
+        console.log(`  SoS (full precision): ${p.sos.toFixed(10)}`);
+        console.log(`=================================================================\n`);
+      }
+    }
+
     // Filter out forfeit players and apply division filter
     const filteredPlayers = Object.values(players).filter(
-      p => p.secondaryName !== 'Forfeit' && (division ? p.secondaryName === division : true),
+      p => p.secondaryName !== 'Forfeit' && !forfeitedPlayerIds.has(p.userId) && (division ? p.secondaryName === division : true),
     );
 
     // Group by (standingName, secondaryName)
@@ -234,15 +356,31 @@ export class StandingsService {
       standingGroups[key].push(p);
     }
 
-    // Sort within each standing group: winRate → H2H → sos, assign standingOrder
-    const cmp = (a: StandingPlayer, b: StandingPlayer) =>
-      this.comparePlayers(a, b, h2h);
-
+    // Sort within each standing group: first position uses H2H, rest use winRate → sos only
     for (const group of Object.values(standingGroups)) {
-      group.sort(cmp);
-      group.forEach((p, i) => {
-        p.standingOrder = i + 1;
-      });
+      // First, sort with H2H to determine first place
+      const cmpFirst = (a: StandingPlayer, b: StandingPlayer) =>
+        this.comparePlayers(a, b, h2h);
+      group.sort(cmpFirst);
+      
+      // Assign first place
+      group[0].standingOrder = 1;
+      
+      // For remaining positions, sort by winRate → sos only (no H2H)
+      if (group.length > 1) {
+        const rest = group.slice(1);
+        const cmpNoH2H = (a: StandingPlayer, b: StandingPlayer) =>
+          this.comparePlayersNoH2H(a, b);
+        rest.sort(cmpNoH2H);
+        
+        // Reassign standingOrder for the rest
+        rest.forEach((p, i) => {
+          p.standingOrder = i + 2;
+        });
+        
+        // Update the group with the new order
+        group.splice(1, group.length - 1, ...rest);
+      }
     }
 
     // Calculate playoff order per secondaryName
@@ -266,11 +404,11 @@ export class StandingsService {
         }
       }
 
-      const playoffCmp = (a: StandingPlayer, b: StandingPlayer) =>
-        this.comparePlayersPlayoff(a, b, h2h);
+      // Sort first place: group by winRate, check H2H for each group
+      this.sortPlayoffGroup(firstPlace, h2h);
 
-      firstPlace.sort(playoffCmp);
-      rest.sort(playoffCmp);
+      // Sort rest: group by winRate, check H2H for each group
+      this.sortPlayoffGroup(rest, h2h);
 
       const ordered = [...firstPlace, ...rest];
       ordered.forEach((p, i) => {
