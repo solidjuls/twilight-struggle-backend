@@ -316,30 +316,30 @@ export class StandingsService {
     for (const playerId of debugPlayerIds) {
       if (players[playerId]) {
         const p = players[playerId];
-        console.log(`\n========== SoS DEBUG for Player ${playerId} (${p.name}) ==========`);
-        console.log(`Games: W=${p.gamesWon} L=${p.gamesLost} T=${p.gamesTied}`);
-        console.log(`Win Rate: ${p.winRate} (${p.winRate * 100}%)`);
-        console.log(`Opponents (${p.opponents.length} total):`);
+        // console.log(`\n========== SoS DEBUG for Player ${playerId} (${p.name}) ==========`);
+        // console.log(`Games: W=${p.gamesWon} L=${p.gamesLost} T=${p.gamesTied}`);
+        // console.log(`Win Rate: ${p.winRate} (${p.winRate * 100}%)`);
+        // console.log(`Opponents (${p.opponents.length} total):`);
         
         let sum = 0;
         p.opponents.forEach((oppId, idx) => {
           const opp = players[oppId];
           if (opp) {
             const oppTotal = opp.gamesWon + opp.gamesLost + opp.gamesTied;
-            console.log(`  ${idx + 1}. Opponent ${oppId} (${opp.name})`);
-            console.log(`     Games: W=${opp.gamesWon} L=${opp.gamesLost} T=${opp.gamesTied} (total=${oppTotal})`);
-            console.log(`     Win Rate: ${opp.winRate} (${opp.winRate * 100}%)`);
-            console.log(`     Running sum: ${sum} + ${opp.winRate} = ${sum + opp.winRate}`);
+            // console.log(`  ${idx + 1}. Opponent ${oppId} (${opp.name})`);
+            // console.log(`     Games: W=${opp.gamesWon} L=${opp.gamesLost} T=${opp.gamesTied} (total=${oppTotal})`);
+            // console.log(`     Win Rate: ${opp.winRate} (${opp.winRate * 100}%)`);
+            // console.log(`     Running sum: ${sum} + ${opp.winRate} = ${sum + opp.winRate}`);
             sum += opp.winRate;
           }
         });
         
-        console.log(`\nFinal SoS Calculation:`);
-        console.log(`  Sum of opponent win rates: ${sum}`);
-        console.log(`  Number of opponents: ${p.opponents.length}`);
-        console.log(`  SoS = ${sum} / ${p.opponents.length} = ${p.sos}`);
-        console.log(`  SoS (full precision): ${p.sos.toFixed(10)}`);
-        console.log(`=================================================================\n`);
+        // console.log(`\nFinal SoS Calculation:`);
+        // console.log(`  Sum of opponent win rates: ${sum}`);
+        // console.log(`  Number of opponents: ${p.opponents.length}`);
+        // console.log(`  SoS = ${sum} / ${p.opponents.length} = ${p.sos}`);
+        // console.log(`  SoS (full precision): ${p.sos.toFixed(10)}`);
+        // console.log(`=================================================================\n`);
       }
     }
 
