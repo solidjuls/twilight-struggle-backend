@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { ShrkbotService } from '../shrkbot/shrkbot.service';
 import { hash, compare } from 'bcrypt';
 import {
   UserDto,
@@ -10,9 +11,44 @@ import {
   UpdatePasswordDto,
 } from './dto/users.dto';
 
+const DISCORD_USER_ID_PATTERN = /^\d{17,20}$/;
+
+export function parseDiscordUserId(value?: string | null): bigint | null | undefined {
+  if (value === undefined) return undefined;
+
+  const trimmed = value?.trim();
+
+  if (!trimmed) return null;
+
+  if (!DISCORD_USER_ID_PATTERN.test(trimmed)) {
+    throw new BadRequestException('Discord User ID must be 17 to 20 digits');
+  }
+
+  return BigInt(trimmed);
+}
+
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly shrkbotService: ShrkbotService,
+  ) {}
+
+  async checkEmailVerified(userId: string): Promise<{ verified: boolean; banned: boolean }> {
+    const user = await this.databaseService.users.findFirst({
+      where: { id: BigInt(userId) },
+      select: { email_verified_at: true, banned: true },
+    });
+
+    if (!user) {
+      return { verified: false, banned: false };
+    }
+
+    return {
+      verified: !!user.email_verified_at,
+      banned: !!user.banned,
+    };
+  }
 
   async getPlayerIdsByCountry(countryId: string): Promise<string[]> {
     const users = await this.databaseService.users.findMany({
@@ -38,6 +74,7 @@ export class UsersService {
         last_name: true,
         playdek_name: true,
         email: true,
+        discord_user_id: true,
         phone_number: true,
         last_login_at: true,
         preferred_gaming_platform: true,
@@ -74,6 +111,7 @@ export class UsersService {
       last_name: user.last_name,
       playdek_name: user.playdek_name,
       email: user.email,
+      discord_user_id: user.discord_user_id?.toString(),
       phone_number: user.phone_number,
       last_login_at: user.last_login_at?.toISOString(),
       preferred_gaming_platform: user.preferred_gaming_platform,
@@ -273,6 +311,9 @@ export class UsersService {
         return { success: false, error: `User with email ${userData.email} already exists` };
       }
 
+      // Hash password
+      const hashedPassword = await hash(userData.password, 12);
+
       // Create new user
       await this.databaseService.users.create({
         data: {
@@ -280,6 +321,7 @@ export class UsersService {
           last_name: userData.last_name,
           playdek_name: userData.playdek_name,
           email: userData.email,
+          password: hashedPassword,
           phone_number: userData.phone_number,
           preferred_gaming_platform: userData.preferredGamingPlatform,
           preferred_game_duration: userData.preferredGameDuration,
@@ -296,22 +338,41 @@ export class UsersService {
   }
 
   async updateUser(userId: string, userData: UpdateUserDto): Promise<{ success: boolean; error?: string }> {
+    const discordUserId = parseDiscordUserId(userData.discord_user_id);
+
     try {
-      await this.databaseService.users.update({
+      const stored = await this.databaseService.users.findUnique({
+        where: { id: BigInt(userId) },
+        select: { discord_user_id: true },
+      });
+
+      const updateData: any = {
+        first_name: userData.firstName,
+        last_name: userData.lastName,
+        playdek_name: userData.playdek_name,
+        discord_user_id: discordUserId,
+        phone_number: userData.phone,
+        preferred_gaming_platform: userData.preferredGamingPlatform,
+        preferred_game_duration: userData.preferredGameDuration,
+        city_id: userData.city,
+        country_id: userData.country,
+      };
+
+      // Hash and include password if provided
+      if (userData.password) {
+        updateData.password = await hash(userData.password, 12);
+      }
+
+      const updated = await this.databaseService.users.update({
         where: {
           id: BigInt(userId),
         },
-        data: {
-          first_name: userData.firstName,
-          last_name: userData.lastName,
-          playdek_name: userData.playdek_name,
-          phone_number: userData.phone,
-          preferred_gaming_platform: userData.preferredGamingPlatform,
-          preferred_game_duration: userData.preferredGameDuration,
-          city_id: userData.city,
-          country_id: userData.country,
-        },
+        data: updateData,
       });
+
+      if (discordUserId !== undefined && discordUserId !== (stored?.discord_user_id ?? null)) {
+        await this.shrkbotService.syncAdministeredTournaments(updated.id);
+      }
 
       return { success: true };
     } catch (error) {
