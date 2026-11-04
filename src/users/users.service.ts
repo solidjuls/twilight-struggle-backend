@@ -446,13 +446,8 @@ export class UsersService {
   }
 
   async getForfeitedPlayers(userRole?: number, userId?: string, tournamentId?: number) {
-    if (userId && tournamentId) {
-      const adminRecord = await this.databaseService.tournament_admins.findFirst({
-        where: { userId: BigInt(userId), tournamentId },
-      });
-      if (!adminRecord) {
-        throw new BadRequestException('You are not admin of this tournament');
-      }
+    if (userRole !== 1) {
+      throw new BadRequestException('Only superadmins can access this endpoint');
     }
 
     const registrations = await this.databaseService.tournament_registration.findMany({
