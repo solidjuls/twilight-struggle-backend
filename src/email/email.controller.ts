@@ -1,9 +1,10 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
+import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus, HttpException } from '@nestjs/common';
 import { EmailService, SMTPConfig } from './email.service';
 import { Public } from '../auth/decorators/auth.decorators';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtPayloadDto } from '../auth/dto/auth.dto';
 import { TournamentsService } from '../tournaments/tournaments.service';
+import { ScheduleService } from '../schedule/schedule.service';
 
 interface TestEmailDto {
   to: string;
@@ -40,11 +41,24 @@ interface ReminderDto {
   ussrTimezone: string;
 }
 
+interface PlayerReminderDto {
+  gameCode: string;
+  playerName: string;
+  playerEmail: string;
+}
+
+interface PlayerReminderBody {
+  data: PlayerReminderDto[];
+  ghostOp?: boolean;
+  bothOp?: boolean;
+}
+
 @Controller('email')
 export class EmailController {
   constructor(
     private emailService: EmailService,
     private tournamentsService: TournamentsService,
+    private scheduleService: ScheduleService,
   ) {}
 
   @Public()
@@ -171,6 +185,104 @@ export class EmailController {
       success: true,
       total: reminders.length,
       results,
+    };
+  }
+
+  @Post('player-reminder')
+  @HttpCode(HttpStatus.OK)
+  async sendPlayerReminder(
+    @Body() body: PlayerReminderBody,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+      user.role,
+      user.id,
+      359,
+    );
+
+    if (!isAdmin) {
+      throw new HttpException(
+        'You are not admin of this tournament',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const smtpConfig: SMTPConfig = {
+      host: process.env.SMTP_HOST || 'localhost',
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER_JUNTA || '',
+      password: process.env.SMTP_PWD_JUNTA || '',
+    };
+
+    const results = [];
+    const bodyType = body.bothOp ? 'both-op' : 'ghost-op';
+
+    for (const reminder of body.data) {
+      try {
+        const success = await this.emailService.sendPlayerReminderEmail(
+          reminder.playerEmail,
+          reminder.playerName,
+          reminder.gameCode,
+          smtpConfig,
+          bodyType,
+        );
+
+        results.push({
+          gameCode: reminder.gameCode,
+          playerName: reminder.playerName,
+          success,
+        });
+      } catch (error) {
+        results.push({
+          gameCode: reminder.gameCode,
+          playerName: reminder.playerName,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      total: body.data.length,
+      results,
+    };
+  }
+
+  @Get('overdue-games')
+  @HttpCode(HttpStatus.OK)
+  async getOverdueGames(
+    @Query('tournamentId') tournamentId: string,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    const isAdmin = await this.tournamentsService.isUserAdminForTournament(
+      user.role,
+      user.id,
+      359,
+    );
+
+    if (!isAdmin) {
+      throw new HttpException(
+        'You are not admin of this tournament',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const tournamentIdNum = Number(tournamentId);
+    if (!tournamentIdNum) {
+      throw new HttpException(
+        'tournamentId is required',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const overdueGames = await this.scheduleService.getOverdueSchedules(tournamentIdNum);
+
+    return {
+      success: true,
+      total: overdueGames.length,
+      games: overdueGames,
     };
   }
 }

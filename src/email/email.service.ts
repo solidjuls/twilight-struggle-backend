@@ -132,6 +132,54 @@ If you encounter any difficulties in contacting the other player, please report 
 <p><strong>ITS Junta</strong></p>
 `
 
+  private readonly playerReminderBodyEmail = (
+    playerName: string,
+    gameCode: string,
+  ) => `
+<p>Hi ${playerName},</p>
+
+<p>The game ${gameCode} is due. Your opponent has tried to contact you without success. Can you schedule a day to play this game?</p>
+
+<p>Regards,</p>
+
+<p><strong>ITS Junta</strong></p>
+`
+
+  private readonly playerReminderBothOpBodyEmail = (
+    playerName: string,
+    gameCode: string,
+  ) => `
+<p>Hi ${playerName},</p>
+
+<p>The game ${gameCode} is due. If you don't play this game, it will count as double loss. Remember that you can contact Junta asking for an extension.</p>
+
+<p>Regards,</p>
+
+<p><strong>ITS Junta</strong></p>
+`
+
+  async sendPlayerReminderEmail(
+    destEmail: string,
+    playerName: string,
+    gameCode: string,
+    smtpConfig: SMTPConfig,
+    bodyType: 'ghost-op' | 'both-op' = 'ghost-op',
+  ) {
+    const subject = `ITSL Season 16 - Game ${gameCode} is due`;
+    const html = bodyType === 'both-op'
+      ? this.playerReminderBothOpBodyEmail(playerName, gameCode)
+      : this.playerReminderBodyEmail(playerName, gameCode);
+
+    const email: EmailOptions = {
+      to: [destEmail],
+      subject,
+      text: '',
+      html,
+    };
+
+    return this.sendEmail(email, smtpConfig);
+  }
+
   async sendReminderEmail(
     destEmails: string[],
     gameCode: string,

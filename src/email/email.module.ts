@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { EmailService } from './email.service';
 import { EmailController } from './email.controller';
 import { TournamentsModule } from '../tournaments/tournaments.module';
+import { ScheduleModule } from '../schedule/schedule.module';
 
 @Module({
-  imports: [TournamentsModule],
+  imports: [TournamentsModule, ScheduleModule],
   controllers: [EmailController],
   providers: [EmailService],
   exports: [EmailService],

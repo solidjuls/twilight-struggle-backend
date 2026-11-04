@@ -444,4 +444,63 @@ export class UsersService {
       return { success: false, error: 'Failed to update user ban status' };
     }
   }
+
+  async getForfeitedPlayers(userRole?: number, userId?: string, tournamentId?: number) {
+    if (userRole !== 1) {
+      throw new BadRequestException('Only superadmins can access this endpoint');
+    }
+
+    const registrations = await this.databaseService.tournament_registration.findMany({
+      where: {
+        ...(tournamentId ? { tournamentId } : {}),
+        status: 'forfeited',
+      },
+      select: {
+        tournaments: {
+          select: { tournament_name: true },
+        },
+        users: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    const valid = registrations.filter(r => r.users);
+
+    if (tournamentId) {
+      return valid.map(r => ({
+        id: r.users!.id.toString(),
+        name: `${r.users!.first_name || ''} ${r.users!.last_name || ''}`.trim(),
+        email: r.users!.email || '',
+      }));
+    }
+
+    const playerMap = new Map<string, { id: string; name: string; email: string; totalForfeits: number; tournamentNames: string[] }>();
+
+    for (const r of valid) {
+      const key = r.users!.id.toString();
+      if (!playerMap.has(key)) {
+        playerMap.set(key, {
+          id: key,
+          name: `${r.users!.first_name || ''} ${r.users!.last_name || ''}`.trim(),
+          email: r.users!.email || '',
+          totalForfeits: 0,
+          tournamentNames: [],
+        });
+      }
+      const entry = playerMap.get(key)!;
+      entry.totalForfeits++;
+      entry.tournamentNames.push(r.tournaments.tournament_name);
+    }
+
+    return Array.from(playerMap.values()).map(p => ({
+      ...p,
+      tournamentNames: p.tournamentNames.join(', '),
+    }));
+  }
 }

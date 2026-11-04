@@ -86,6 +86,21 @@ export class UsersController {
     }
   }
 
+  @Get('forfeited-players')
+  async getForfeitedPlayers(
+    @Query('tournamentId') tournamentId: string | undefined,
+    @CurrentUser() user: JwtPayloadDto,
+  ) {
+    const tournamentIdNum = tournamentId ? Number(tournamentId) : undefined;
+    const players = await this.usersService.getForfeitedPlayers(user.role, String(user.id), tournamentIdNum);
+
+    return {
+      success: true,
+      total: players.length,
+      players,
+    };
+  }
+
   @Get(':id')
   async getUserById(
     @Param('id') id: string,

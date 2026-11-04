@@ -314,6 +314,29 @@ export class GamesService {
 
   async submitGame(data: SubmitGameDto): Promise<any> {
     try {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+      const existingGame = await this.databaseService.game_results.findFirst({
+        where: {
+          usa_player_id: BigInt(data.usaPlayerId),
+          ussr_player_id: BigInt(data.ussrPlayerId),
+          tournament_id: Number(data.tournamentId),
+          game_date: {
+            gte: startOfDay,
+            lt: endOfDay,
+          },
+        },
+      });
+
+      if (existingGame) {
+        const existingParsed = JSON.stringify(existingGame, (_key, value) =>
+          typeof value === 'bigint' ? value.toString() : value,
+        );
+        return JSON.parse(existingParsed);
+      }
+
       const { newUsaRating, newUssrRating, usaRating, ussrRating } =
         await this.ratingService.calculateRating({
           usaPlayerId: BigInt(data.usaPlayerId),
