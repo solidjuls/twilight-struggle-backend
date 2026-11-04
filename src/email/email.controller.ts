@@ -47,6 +47,12 @@ interface PlayerReminderDto {
   playerEmail: string;
 }
 
+interface PlayerReminderBody {
+  data: PlayerReminderDto[];
+  ghostOp?: boolean;
+  bothOp?: boolean;
+}
+
 @Controller('email')
 export class EmailController {
   constructor(
@@ -185,7 +191,7 @@ export class EmailController {
   @Post('player-reminder')
   @HttpCode(HttpStatus.OK)
   async sendPlayerReminder(
-    @Body() reminders: PlayerReminderDto[],
+    @Body() body: PlayerReminderBody,
     @CurrentUser() user: JwtPayloadDto,
   ) {
     const isAdmin = await this.tournamentsService.isUserAdminForTournament(
@@ -210,14 +216,16 @@ export class EmailController {
     };
 
     const results = [];
+    const bodyType = body.bothOp ? 'both-op' : 'ghost-op';
 
-    for (const reminder of reminders) {
+    for (const reminder of body.data) {
       try {
         const success = await this.emailService.sendPlayerReminderEmail(
           reminder.playerEmail,
           reminder.playerName,
           reminder.gameCode,
           smtpConfig,
+          bodyType,
         );
 
         results.push({
@@ -237,7 +245,7 @@ export class EmailController {
 
     return {
       success: true,
-      total: reminders.length,
+      total: body.data.length,
       results,
     };
   }
