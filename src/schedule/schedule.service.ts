@@ -709,6 +709,57 @@ export class ScheduleService {
     // console.log("deleted", deleted);
   }
 
+  async getOverdueSchedules(tournamentId: number) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const schedules = await this.databaseService.schedule.findMany({
+      where: {
+        tournaments_id: tournamentId,
+        game_results_id: null,
+        due_date: { lt: today },
+      },
+      select: {
+        id: true,
+        game_code: true,
+        due_date: true,
+        users_schedule_usa_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+        users_schedule_ussr_player_idTousers: {
+          select: {
+            id: true,
+            first_name: true,
+            last_name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { due_date: 'asc' },
+    });
+
+    return schedules.map(s => ({
+      id: s.id,
+      gameCode: s.game_code,
+      dueDate: s.due_date.toISOString(),
+      usaPlayer: s.users_schedule_usa_player_idTousers ? {
+        id: s.users_schedule_usa_player_idTousers.id.toString(),
+        name: `${s.users_schedule_usa_player_idTousers.first_name || ''} ${s.users_schedule_usa_player_idTousers.last_name || ''}`.trim(),
+        email: s.users_schedule_usa_player_idTousers.email || '',
+      } : null,
+      ussrPlayer: s.users_schedule_ussr_player_idTousers ? {
+        id: s.users_schedule_ussr_player_idTousers.id.toString(),
+        name: `${s.users_schedule_ussr_player_idTousers.first_name || ''} ${s.users_schedule_ussr_player_idTousers.last_name || ''}`.trim(),
+        email: s.users_schedule_ussr_player_idTousers.email || '',
+      } : null,
+    }));
+  }
+
   async getUpcomingSchedules(tournamentId: number, days: number, includePast: boolean) {
     const now = new Date();
     const upperDate = new Date();

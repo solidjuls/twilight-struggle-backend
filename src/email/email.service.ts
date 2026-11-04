@@ -132,6 +132,37 @@ If you encounter any difficulties in contacting the other player, please report 
 <p><strong>ITS Junta</strong></p>
 `
 
+  private readonly playerReminderBodyEmail = (
+    playerName: string,
+    gameCode: string,
+  ) => `
+<p>Hi ${playerName},</p>
+
+<p>The game ${gameCode} is due. Your opponent has tried to contact you without success. Can you schedule a day to play this game?</p>
+
+<p>Regards,</p>
+
+<p><strong>ITS Junta</strong></p>
+`
+
+  async sendPlayerReminderEmail(
+    destEmail: string,
+    playerName: string,
+    gameCode: string,
+    smtpConfig: SMTPConfig,
+  ) {
+    const subject = `ITSL Season 16 - Game ${gameCode} is due`;
+
+    const email: EmailOptions = {
+      to: [destEmail],
+      subject,
+      text: '',
+      html: this.playerReminderBodyEmail(playerName, gameCode),
+    };
+
+    return this.sendEmail(email, smtpConfig);
+  }
+
   async sendReminderEmail(
     destEmails: string[],
     gameCode: string,
