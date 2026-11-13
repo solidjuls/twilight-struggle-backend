@@ -327,6 +327,7 @@ export class UsersService {
           preferred_game_duration: userData.preferredGameDuration,
           city_id: userData.city,
           country_id: userData.country,
+          role_id: 3,
         },
       });
 

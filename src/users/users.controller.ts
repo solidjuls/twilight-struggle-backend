@@ -11,6 +11,7 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -158,19 +159,11 @@ export class UsersController {
 
   @Put()
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async createUser(
     @Body() userData: CreateUserDto,
-    @CurrentUser() user: JwtPayloadDto,
   ) {
     try {
-      // Check if user has admin privileges (role_id 1 = SUPERADMIN, 2 = TOURNAMENT_ADMIN)
-      if (user.role !== 1 && user.role !== 2) {
-        throw new HttpException(
-          'Insufficient privileges to create users',
-          HttpStatus.FORBIDDEN,
-        );
-      }
-
       const result = await this.usersService.createUser(userData);
       
       if (!result.success) {
