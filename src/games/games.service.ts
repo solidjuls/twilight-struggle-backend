@@ -314,19 +314,15 @@ export class GamesService {
 
   async submitGame(data: SubmitGameDto): Promise<any> {
     try {
-      const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      const dateNow = new Date(Date.now());
+      dateNow.setMilliseconds(0);
 
       const existingGame = await this.databaseService.game_results.findFirst({
         where: {
           usa_player_id: BigInt(data.usaPlayerId),
           ussr_player_id: BigInt(data.ussrPlayerId),
           tournament_id: Number(data.tournamentId),
-          game_date: {
-            gte: startOfDay,
-            lt: endOfDay,
-          },
+          game_date: dateNow,
         },
       });
 
@@ -345,7 +341,6 @@ export class GamesService {
           tournamentId: data.tournamentId,
         });
 
-      const dateNow = new Date(Date.now());
       const newGame = {
         created_at: dateNow,
         updated_at: dateNow,
